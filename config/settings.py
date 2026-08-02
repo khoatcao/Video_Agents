@@ -38,10 +38,13 @@ def _optional(name: str, default: str = "") -> str:
 OLLAMA_BASE_URL: str = _optional("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # ── Model aliases ─────────────────────────────────────────────────────────────
-MODEL_REASONING: str = "deepseek-r1:14b"    # ResearchAgent, ContentAgent
-MODEL_CODE: str = "deepseek-coder:6.7b"     # RemotionAgent
-MODEL_FAST: str = "qwen2.5:7b"              # MetadataAgent, SchedulerAgent
-MODEL_AFFILIATE: str = "deepseek-r1:7b"     # AffiliateAgent
+# All agents use qwen2.5:7b — single lightweight model, low VRAM (~5 GB),
+# sufficient for Vietnamese content, code generation, and product matching
+# at this video-generation workload.
+MODEL_REASONING: str = "qwen2.5:7b"
+MODEL_CODE: str = "qwen2.5:7b"
+MODEL_FAST: str = "qwen2.5:7b"
+MODEL_AFFILIATE: str = "qwen2.5:7b"
 
 # ── Tavily ────────────────────────────────────────────────────────────────────
 TAVILY_API_KEY: str = _require("TAVILY_API_KEY")

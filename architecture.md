@@ -140,9 +140,7 @@ YouTube Agent        Affiliate Agent
 |-------------------|-------------------------------------------------|
 | Agent framework   | LangGraph (orchestration) + LangChain (tools)   |
 | Local LLM runtime | Ollama                                          |
-| Reasoning model   | `deepseek-r1:14b`                               |
-| Code model        | `deepseek-coder:6.7b`                           |
-| Fast model        | `qwen2.5:7b`                                    |
+| Model (all agents)| `qwen2.5:7b`                                    |
 | Web search        | Tavily API                                      |
 | Motion graphics   | Remotion + React (TypeScript)                   |
 | Render            | `@remotion/renderer` (TypeScript/Node.js)       |
@@ -156,27 +154,32 @@ YouTube Agent        Affiliate Agent
 
 ## LLM Assignment
 
-| Agent       | Model                  | Reason                                          |
-|-------------|------------------------|-------------------------------------------------|
-| Orchestrator| `deepseek-r1:14b`      | Heavy reasoning — routing, decisions, retries   |
-| Content     | `deepseek-r1:14b`      | Analyze trends, write Vietnamese scene plans    |
-| Remotion    | `deepseek-coder:6.7b`  | Lightweight code — TypeScript/React generation  |
-| Render      | None                   | Subprocess only                                 |
-| YouTube     | `qwen2.5:7b`           | Simple metadata formatting                      |
-| Facebook    | `qwen2.5:7b`           | Simple caption formatting                       |
-| Scheduler   | None                   | Pure cron logic                                 |
-| Affiliate   | `deepseek-r1:7b`       | Light reasoning — product-topic matching        |
+All agents that require an LLM use a single model: **`qwen2.5:7b`**
+
+> **Why `qwen2.5:7b` for everything?**
+> - Single model to pull and maintain — `ollama pull qwen2.5:7b` is all that's needed
+> - Only ~5 GB VRAM — runs comfortably on a single consumer GPU
+> - Strong enough for Vietnamese content writing, TypeScript/React code generation, metadata formatting, and product-topic matching at this workload
+> - Avoids juggling multiple large models (deepseek-r1:14b needed ~10 GB, deepseek-coder:6.7b ~4 GB, deepseek-r1:7b ~5 GB) that would require 20+ GB VRAM concurrently
+
+| Agent       | Model         | Notes                          |
+|-------------|---------------|--------------------------------|
+| Orchestrator| `qwen2.5:7b`  | Routing, decisions, retries    |
+| Content     | `qwen2.5:7b`  | Vietnamese scene plans         |
+| Remotion    | `qwen2.5:7b`  | TypeScript/React generation    |
+| Render      | None          | Subprocess only                |
+| YouTube     | `qwen2.5:7b`  | Metadata formatting            |
+| Facebook    | `qwen2.5:7b`  | Caption formatting             |
+| Scheduler   | None          | Pure cron logic                |
+| Affiliate   | `qwen2.5:7b`  | Product-topic matching         |
 
 ---
 
 ## Hardware Requirements
 
-| Model                 | VRAM    |
-|-----------------------|---------|
-| `deepseek-r1:14b`     | ~10 GB  |
-| `deepseek-coder:6.7b` | ~4 GB   |
-| `qwen2.5:7b`          | ~5 GB   |
-| `deepseek-r1:7b`      | ~5 GB   |
+| Model        | VRAM   |
+|--------------|--------|
+| `qwen2.5:7b` | ~5 GB  |
 
 Minimum recommended: **16GB VRAM GPU** to run models concurrently.
 
