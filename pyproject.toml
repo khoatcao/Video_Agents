@@ -1,0 +1,52 @@
+[project]
+name = "video-agent"
+version = "0.1.0"
+description = "LangGraph multi-agent system for generating AI/tech educational short-form videos"
+requires-python = "^3.11"
+dependencies = [
+    "langgraph>=0.2,<0.3",
+    "langchain>=0.3,<0.4",
+    "langchain-ollama>=0.2,<0.3",
+    "langchain-community>=0.3,<0.4",
+    "langchain-core>=0.3,<0.4",
+    "tavily-python>=0.5,<0.6",
+    "google-api-python-client>=2,<3",
+    "google-auth-oauthlib>=1,<2",
+    "requests>=2,<3",
+    "python-dotenv>=1,<2",
+    "apscheduler>=3,<4",
+    "pydantic>=2,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "types-requests>=2.31",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["state", "config", "tools", "agents", "graph"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

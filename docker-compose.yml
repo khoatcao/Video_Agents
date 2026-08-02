@@ -1,0 +1,45 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: video-agent-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  video-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: video-agent-scheduler
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Override Ollama host to use the service name inside Docker network
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+    command: python -m agents.scheduler
+
+volumes:
+  ollama-models:
+    name: video-agent-ollama-models

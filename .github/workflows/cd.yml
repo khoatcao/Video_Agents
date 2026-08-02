@@ -1,0 +1,73 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Time slot to run manually"
+        required: true
+        type: choice
+        options:
+          - morning
+          - afternoon
+          - evening
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Pull latest code
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd ~/Video_Agent && git pull origin main"
+
+      - name: Install Python dependencies
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd ~/Video_Agent && pip install -e ."
+
+      - name: Install Node dependencies
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd ~/Video_Agent/remotion && npm ci"
+
+      - name: Restart scheduler service
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "sudo systemctl restart video-agent-scheduler"
+
+      - name: Verify service is running
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "systemctl is-active --quiet video-agent-scheduler && echo 'Service is running' || (echo 'Service failed to start' && exit 1)"
+
+  manual-run:
+    name: Manual Pipeline Run
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    needs: deploy
+    environment: production
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Run pipeline for slot
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd ~/Video_Agent && python -m agents.scheduler --run-now --slot ${{ github.event.inputs.slot }}"

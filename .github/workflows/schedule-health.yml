@@ -1,0 +1,97 @@
+name: Schedule Health Check
+
+on:
+  schedule:
+    # UTC equivalents of Vietnam (UTC+7) posting times:
+    #   8:00 AM ICT  = 01:00 UTC
+    #   12:30 PM ICT = 05:30 UTC
+    #   8:00 PM ICT  = 13:00 UTC
+    # Checks run 10 minutes after each expected post to confirm delivery.
+    - cron: "10 1 * * *"   # 8:10 AM ICT — morning slot check
+    - cron: "40 5 * * *"   # 12:40 PM ICT — afternoon slot check
+    - cron: "10 13 * * *"  # 8:10 PM ICT — evening slot check
+
+jobs:
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check health endpoint
+        id: health
+        run: |
+          HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+            --max-time 15 \
+            "http://${{ secrets.SSH_HOST }}:8080/health")
+          echo "status=$HTTP_STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "HEALTH_FAILED=true" >> "$GITHUB_ENV"
+            echo "Health check returned HTTP $HTTP_STATUS"
+          else
+            echo "HEALTH_FAILED=false" >> "$GITHUB_ENV"
+            echo "Health check passed (HTTP 200)"
+          fi
+
+      - name: Check last video posted
+        id: last_video
+        if: env.HEALTH_FAILED == 'false'
+        run: |
+          RESPONSE=$(curl --silent --max-time 15 \
+            "http://${{ secrets.SSH_HOST }}:8080/status/last-post")
+          echo "$RESPONSE"
+          # Expect JSON with { "posted_at": "<ISO timestamp>", "status": "ok" }
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "parse_error")
+          echo "last_post_status=$STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" != "ok" ]; then
+            echo "HEALTH_FAILED=true" >> "$GITHUB_ENV"
+            echo "Last post status: $STATUS"
+          fi
+
+      - name: Notify Slack on failure
+        if: env.HEALTH_FAILED == 'true'
+        run: |
+          # Determine which slot this check belongs to
+          HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
+          if [ "$HOUR" = "01" ]; then
+            SLOT="morning (8:00 AM ICT)"
+          elif [ "$HOUR" = "05" ]; then
+            SLOT="afternoon (12:30 PM ICT)"
+          else
+            SLOT="evening (8:00 PM ICT)"
+          fi
+
+          curl --silent --fail -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            --header "Content-Type: application/json" \
+            --data "{
+              \"text\": \":rotating_light: *Video Agent Health Check FAILED*\",
+              \"attachments\": [
+                {
+                  \"color\": \"danger\",
+                  \"fields\": [
+                    {\"title\": \"Slot\", \"value\": \"$SLOT\", \"short\": true},
+                    {\"title\": \"HTTP Status\", \"value\": \"${{ steps.health.outputs.status }}\", \"short\": true},
+                    {\"title\": \"Last Post Status\", \"value\": \"${{ steps.last_video.outputs.last_post_status }}\", \"short\": true},
+                    {\"title\": \"Server\", \"value\": \"${{ secrets.SSH_HOST }}\", \"short\": true},
+                    {\"title\": \"Run URL\", \"value\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"short\": false}
+                  ]
+                }
+              ]
+            }"
+
+      - name: Notify Slack on success
+        if: env.HEALTH_FAILED == 'false'
+        run: |
+          HOUR=$(date -u +%H)
+          if [ "$HOUR" = "01" ]; then
+            SLOT="morning (8:00 AM ICT)"
+          elif [ "$HOUR" = "05" ]; then
+            SLOT="afternoon (12:30 PM ICT)"
+          else
+            SLOT="evening (8:00 PM ICT)"
+          fi
+
+          curl --silent --fail -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            --header "Content-Type: application/json" \
+            --data "{
+              \"text\": \":white_check_mark: *Video Agent health check passed* — $SLOT slot posted successfully.\"
+            }"
