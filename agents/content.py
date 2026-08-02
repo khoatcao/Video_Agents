@@ -79,13 +79,13 @@ def content_node(state: PipelineState) -> dict:
 
     # ── 1. Web search for trending context ────────────────────────────────────
     search_query = f"trending AI agents {topic} Vietnam"
-    logger.info("[ContentAgent] Searching DuckDuckGo: %r", search_query)
+    logger.info("[ContentAgent] Fetching RSS feeds for: %r", search_query)
     try:
         search_results: str = search_trending_ai_topics.invoke(
             {"query": search_query, "max_results": 5}
         )
     except Exception as exc:
-        logger.warning("[ContentAgent] DuckDuckGo search failed: %s — continuing without results", exc)
+        logger.warning("[ContentAgent] RSS search failed: %s — continuing without results", exc)
         search_results = "Search unavailable."
 
     # ── 2. Build LLM prompt ────────────────────────────────────────────────────

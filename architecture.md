@@ -141,7 +141,7 @@ YouTube Agent        Affiliate Agent
 | Agent framework   | LangGraph (orchestration) + LangChain (tools)   |
 | Local LLM runtime | Ollama                                          |
 | Model (all agents)| `qwen2.5:7b`                                    |
-| Web search        | DuckDuckGo (free, no API key)                   |
+| Web search        | RSS feeds — HN, TechCrunch, VnExpress, etc.     |
 | Motion graphics   | Remotion + React (TypeScript)                   |
 | Render            | `@remotion/renderer` (TypeScript/Node.js)       |
 | YouTube upload    | YouTube Data API v3                             |
