@@ -46,9 +46,6 @@ MODEL_CODE: str = "qwen2.5:7b"
 MODEL_FAST: str = "qwen2.5:7b"
 MODEL_AFFILIATE: str = "qwen2.5:7b"
 
-# ── Tavily ────────────────────────────────────────────────────────────────────
-TAVILY_API_KEY: str = _require("TAVILY_API_KEY")
-
 # ── YouTube OAuth2 ────────────────────────────────────────────────────────────
 YOUTUBE_CLIENT_ID: str = _require("YOUTUBE_CLIENT_ID")
 YOUTUBE_CLIENT_SECRET: str = _require("YOUTUBE_CLIENT_SECRET")
@@ -60,9 +57,9 @@ FACEBOOK_PAGE_ID: str = _require("FACEBOOK_PAGE_ID")
 
 # ── Affiliate networks ────────────────────────────────────────────────────────
 SHOPEE_AFFILIATE_ID: str = _optional("SHOPEE_AFFILIATE_ID")
-ACCESSTRADE_API_KEY: str = _optional("ACCESSTRADE_API_KEY")
 LAZADA_AFFILIATE_KEY: str = _optional("LAZADA_AFFILIATE_KEY")
 TIKI_AFFILIATE_KEY: str = _optional("TIKI_AFFILIATE_KEY")
+# ACCESSTRADE_API_KEY will be added later
 
 # ── Pipeline I/O ──────────────────────────────────────────────────────────────
 OUTPUT_DIR: Path = Path(_optional("OUTPUT_DIR", "./outputs")).resolve()

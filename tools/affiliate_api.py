@@ -3,9 +3,10 @@ Affiliate link helpers for the Vietnamese market.
 
 Supported networks:
   - Shopee Vietnam  (unofficial product search + affiliate deep-link)
-  - AccessTrade     (official REST API)
   - Lazada Vietnam  (affiliate deep-link via tracking parameter)
   - Tiki Vietnam    (affiliate deep-link via tracking parameter)
+
+AccessTrade will be added later.
 
 All public functions return a list of product dicts compatible with the
 AffiliateLink TypedDict in state/pipeline_state.py.
@@ -20,7 +21,6 @@ from typing import Any
 import requests
 
 from config.settings import (
-    ACCESSTRADE_API_KEY,
     LAZADA_AFFILIATE_KEY,
     SHOPEE_AFFILIATE_ID,
     TIKI_AFFILIATE_KEY,
@@ -128,67 +128,6 @@ def _shopee_fallback_search(keyword: str, limit: int) -> list[dict[str, str]]:
             "price_range": "Xem trên Shopee",
         }
     ][:limit]
-
-
-# ── AccessTrade Vietnam ────────────────────────────────────────────────────────
-
-_ACCESSTRADE_BASE = "https://api.accesstrade.vn/v1"
-
-
-def get_accesstrade_links(keyword: str, limit: int = 3) -> list[dict[str, str]]:
-    """
-    Search AccessTrade Vietnam's offer catalogue for products matching *keyword*.
-
-    AccessTrade aggregates offers from many Vietnamese e-commerce merchants
-    (Tiki, Sendo, FPT Shop, etc.) and pays commission on sales.
-
-    Args:
-        keyword: Search term.
-        limit:   Maximum number of offers to return.
-
-    Returns:
-        List of product dicts with keys: product_name, url, platform, price_range.
-    """
-    if not ACCESSTRADE_API_KEY:
-        logger.warning("ACCESSTRADE_API_KEY not set — skipping AccessTrade search")
-        return []
-
-    limit = min(limit, 5)
-    try:
-        resp = requests.get(
-            f"{_ACCESSTRADE_BASE}/offers",
-            headers={"Authorization": f"Token {ACCESSTRADE_API_KEY}"},
-            params={
-                "keyword": keyword,
-                "status": "active",
-                "limit": limit,
-            },
-            timeout=_REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        offers: list[dict] = resp.json().get("data", [])
-    except Exception as exc:
-        logger.warning("AccessTrade API error for %r: %s", keyword, exc)
-        return []
-
-    results: list[dict[str, str]] = []
-    for offer in offers[:limit]:
-        name: str = offer.get("name") or offer.get("campaign_name", "")
-        tracking_url: str = offer.get("tracking_url") or offer.get("url", "")
-        commission: str = offer.get("commission_rate") or offer.get("commission", "")
-        if not (name and tracking_url):
-            continue
-        price_range = f"Hoa hồng: {commission}" if commission else "Xem AccessTrade"
-        results.append(
-            {
-                "product_name": name,
-                "url": tracking_url,
-                "platform": "accesstrade",
-                "price_range": price_range,
-            }
-        )
-
-    return results
 
 
 # ── Lazada Vietnam ─────────────────────────────────────────────────────────────
@@ -331,7 +270,6 @@ def format_affiliate_comment(products: list[dict[str, str]]) -> str:
         "shopee": "🟠",
         "lazada": "🔵",
         "tiki": "🔴",
-        "accesstrade": "🟢",
     }
     for product in products:
         name = product.get("product_name", "Sản phẩm")

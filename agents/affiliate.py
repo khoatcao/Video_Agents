@@ -26,7 +26,6 @@ from config.settings import MODEL_AFFILIATE, OLLAMA_BASE_URL
 from state.pipeline_state import PipelineState
 from tools.affiliate_api import (
     format_affiliate_comment,
-    get_accesstrade_links,
     get_shopee_affiliate_link,
 )
 from tools.facebook_api import post_facebook_comment
@@ -109,21 +108,14 @@ def affiliate_pre_node(state: PipelineState) -> dict:
 
     logger.info("[AffiliateAgent/pre] Searching products for keyword=%r", primary_keyword)
 
-    # ── 1. Fetch candidate products from Shopee + AccessTrade ─────────────────
+    # ── 1. Fetch candidate products from Shopee ───────────────────────────────
     candidate_products: list[dict] = []
     try:
-        shopee_results = get_shopee_affiliate_link(primary_keyword, limit=3)
+        shopee_results = get_shopee_affiliate_link(primary_keyword, limit=5)
         candidate_products.extend(shopee_results)
         logger.debug("[AffiliateAgent/pre] Shopee returned %d products.", len(shopee_results))
     except Exception as exc:
         logger.warning("[AffiliateAgent/pre] Shopee search failed: %s", exc)
-
-    try:
-        at_results = get_accesstrade_links(primary_keyword, limit=3)
-        candidate_products.extend(at_results)
-        logger.debug("[AffiliateAgent/pre] AccessTrade returned %d products.", len(at_results))
-    except Exception as exc:
-        logger.warning("[AffiliateAgent/pre] AccessTrade search failed: %s", exc)
 
     if not candidate_products:
         logger.warning("[AffiliateAgent/pre] No candidate products found; returning empty list.")

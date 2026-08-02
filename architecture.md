@@ -141,12 +141,12 @@ YouTube Agent        Affiliate Agent
 | Agent framework   | LangGraph (orchestration) + LangChain (tools)   |
 | Local LLM runtime | Ollama                                          |
 | Model (all agents)| `qwen2.5:7b`                                    |
-| Web search        | Tavily API                                      |
+| Web search        | DuckDuckGo (free, no API key)                   |
 | Motion graphics   | Remotion + React (TypeScript)                   |
 | Render            | `@remotion/renderer` (TypeScript/Node.js)       |
 | YouTube upload    | YouTube Data API v3                             |
 | Facebook upload   | Meta Graph API                                  |
-| Affiliate         | Shopee / Lazada / AccessTrade / Tiki            |
+| Affiliate         | Shopee / Lazada / Tiki (AccessTrade coming later)|
 | Language          | Python (agents) + TypeScript (Remotion + render)|
 | Target market     | Vietnam (UTC+7, Vietnamese content)             |
 
