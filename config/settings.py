@@ -46,14 +46,14 @@ MODEL_CODE: str = "qwen2.5:7b"
 MODEL_FAST: str = "qwen2.5:7b"
 MODEL_AFFILIATE: str = "qwen2.5:7b"
 
-# ── YouTube OAuth2 ────────────────────────────────────────────────────────────
-YOUTUBE_CLIENT_ID: str = _require("YOUTUBE_CLIENT_ID")
-YOUTUBE_CLIENT_SECRET: str = _require("YOUTUBE_CLIENT_SECRET")
-YOUTUBE_REFRESH_TOKEN: str = _require("YOUTUBE_REFRESH_TOKEN")
+# ── YouTube OAuth2 (optional — leave blank to skip upload) ───────────────────
+YOUTUBE_CLIENT_ID: str = _optional("YOUTUBE_CLIENT_ID")
+YOUTUBE_CLIENT_SECRET: str = _optional("YOUTUBE_CLIENT_SECRET")
+YOUTUBE_REFRESH_TOKEN: str = _optional("YOUTUBE_REFRESH_TOKEN")
 
-# ── Facebook / Meta Graph API ─────────────────────────────────────────────────
-FACEBOOK_ACCESS_TOKEN: str = _require("FACEBOOK_ACCESS_TOKEN")
-FACEBOOK_PAGE_ID: str = _require("FACEBOOK_PAGE_ID")
+# ── Facebook / Meta Graph API (optional — leave blank to skip upload) ─────────
+FACEBOOK_ACCESS_TOKEN: str = _optional("FACEBOOK_ACCESS_TOKEN")
+FACEBOOK_PAGE_ID: str = _optional("FACEBOOK_PAGE_ID")
 
 # ── Affiliate networks ────────────────────────────────────────────────────────
 SHOPEE_AFFILIATE_ID: str = _optional("SHOPEE_AFFILIATE_ID")

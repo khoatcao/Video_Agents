@@ -18,7 +18,7 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
-from config.settings import FACEBOOK_PAGE_ID, MODEL_FAST, OLLAMA_BASE_URL
+from config.settings import FACEBOOK_ACCESS_TOKEN, FACEBOOK_PAGE_ID, MODEL_FAST, OLLAMA_BASE_URL
 from state.pipeline_state import PipelineState
 from tools.facebook_api import upload_facebook_reel
 
@@ -92,6 +92,10 @@ def facebook_node(state: PipelineState) -> dict:
     mp4_path: str = state.get("mp4_path", "")
     facebook_metadata: dict = state.get("facebook_metadata", {})
     affiliate_links: list = state.get("affiliate_links", [])
+
+    if not FACEBOOK_ACCESS_TOKEN:
+        logger.info("[FacebookAgent] FACEBOOK_ACCESS_TOKEN not set — skipping upload.")
+        return {"facebook_post_id": "", "facebook_url": "", "error": None}
 
     if not mp4_path:
         err = "mp4_path is empty — cannot upload to Facebook."

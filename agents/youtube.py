@@ -18,7 +18,7 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
-from config.settings import MODEL_FAST, OLLAMA_BASE_URL
+from config.settings import MODEL_FAST, OLLAMA_BASE_URL, YOUTUBE_CLIENT_ID
 from state.pipeline_state import PipelineState
 from tools.youtube_api import upload_youtube_short
 
@@ -72,6 +72,10 @@ def youtube_node(state: PipelineState) -> dict:
     """
     mp4_path: str = state.get("mp4_path", "")
     youtube_metadata: dict = state.get("youtube_metadata", {})
+
+    if not YOUTUBE_CLIENT_ID:
+        logger.info("[YouTubeAgent] YOUTUBE_CLIENT_ID not set — skipping upload.")
+        return {"youtube_url": "", "error": None}
 
     if not mp4_path:
         err = "mp4_path is empty — cannot upload to YouTube."
