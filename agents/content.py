@@ -2,8 +2,8 @@
 Content Agent node for the LangGraph video-generation pipeline.
 
 Responsibilities:
-  1. Search for trending AI/tech articles via Tavily.
-  2. Prompt deepseek-r1:14b (via Ollama) with the CONTENT_AGENT_SYSTEM_PROMPT.
+  1. Search for trending AI/tech articles via DuckDuckGo.
+  2. Prompt qwen2.5:7b (via Ollama) with the CONTENT_AGENT_SYSTEM_PROMPT.
   3. Parse the JSON response into scene_plan, youtube_metadata, facebook_metadata.
   4. Return a partial state dict for LangGraph to merge into PipelineState.
 """
@@ -78,14 +78,14 @@ def content_node(state: PipelineState) -> dict:
     slot: str = state["slot"]
 
     # ── 1. Web search for trending context ────────────────────────────────────
-    search_query = f"trending AI agents {topic} Vietnam 2024"
-    logger.info("[ContentAgent] Searching Tavily: %r", search_query)
+    search_query = f"trending AI agents {topic} Vietnam"
+    logger.info("[ContentAgent] Searching DuckDuckGo: %r", search_query)
     try:
         search_results: str = search_trending_ai_topics.invoke(
             {"query": search_query, "max_results": 5}
         )
     except Exception as exc:
-        logger.warning("[ContentAgent] Tavily search failed: %s — continuing without results", exc)
+        logger.warning("[ContentAgent] DuckDuckGo search failed: %s — continuing without results", exc)
         search_results = "Search unavailable."
 
     # ── 2. Build LLM prompt ────────────────────────────────────────────────────

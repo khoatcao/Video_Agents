@@ -73,13 +73,21 @@ def render_node(state: PipelineState) -> dict:
     }
     scene_data_json = json.dumps(scene_data)
 
-    cmd = ["npx", "ts-node", "render.ts", "--scene-data", scene_data_json]
-    logger.info(
-        "[RenderAgent] Rendering %d frames → %s",
-        total_frames,
+    # Use Remotion CLI directly — cross-platform, no ts-node needed
+    # frames flag: 0-based inclusive range, e.g. 0-659 for 660 frames
+    frames_range = f"0-{total_frames - 1}"
+    cmd = [
+        "npx", "remotion", "render",
+        "src/index.ts",
+        _COMPOSITION_ID,
         mp4_path,
-    )
-    logger.debug("[RenderAgent] Command: %s", " ".join(cmd))
+        f"--frames={frames_range}",
+        "--codec=h264",
+        "--image-format=jpeg",
+        "--overwrite",
+    ]
+    logger.info("[RenderAgent] Rendering %d frames → %s", total_frames, mp4_path)
+    logger.info("[RenderAgent] Command: %s", " ".join(cmd))
 
     # ── 4. Run subprocess ──────────────────────────────────────────────────────
     try:
@@ -95,7 +103,7 @@ def render_node(state: PipelineState) -> dict:
         logger.error("[RenderAgent] %s", err)
         return {"error": err, "status": "failed"}
     except FileNotFoundError as exc:
-        err = f"npx/ts-node not found: {exc}. Ensure Node.js is installed."
+        err = f"npx not found: {exc}. Ensure Node.js is installed and npm install has been run."
         logger.error("[RenderAgent] %s", err)
         return {"error": err, "status": "failed"}
 
@@ -110,8 +118,8 @@ def render_node(state: PipelineState) -> dict:
         logger.error("[RenderAgent] %s", err)
         return {"error": err, "status": "failed"}
 
-    # render.ts prints the resolved output path on stdout
-    resolved_path = result.stdout.strip() or mp4_path
+    # Remotion CLI writes to the path we specified — just verify it exists
+    resolved_path = mp4_path
     if not Path(resolved_path).is_file():
         err = f"Render succeeded but output file not found: {resolved_path}"
         logger.error("[RenderAgent] %s", err)
