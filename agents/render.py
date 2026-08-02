@@ -99,14 +99,14 @@ def render_node(state: PipelineState) -> dict:
         logger.error("[RenderAgent] %s", err)
         return {"error": err, "status": "failed"}
 
-    # Log stderr progress output (render.ts writes progress there)
+    # Log stderr — always at INFO so render progress is visible
     if result.stderr:
         for line in result.stderr.splitlines():
-            logger.debug("[RenderAgent/ts-node] %s", line)
+            logger.info("[RenderAgent/ts-node] %s", line)
 
     if result.returncode != 0:
-        stderr_tail = result.stderr[-2000:] if result.stderr else "<no stderr>"
-        err = f"render.ts exited with code {result.returncode}. stderr:\n{stderr_tail}"
+        stderr_tail = result.stderr[-3000:] if result.stderr else "<no stderr>"
+        err = f"render.ts exited with code {result.returncode}.\n{stderr_tail}"
         logger.error("[RenderAgent] %s", err)
         return {"error": err, "status": "failed"}
 
