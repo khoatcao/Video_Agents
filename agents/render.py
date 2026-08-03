@@ -73,15 +73,13 @@ def render_node(state: PipelineState) -> dict:
     }
     scene_data_json = json.dumps(scene_data)
 
-    # Use Remotion CLI directly — cross-platform, no ts-node needed
-    # frames flag: 0-based inclusive range, e.g. 0-659 for 660 frames
-    frames_range = f"0-{total_frames - 1}"
+    # Root.tsx imports TOTAL_FRAMES from VideoComposition.tsx, so durationInFrames
+    # is always correct. No --frames flag needed — Remotion renders all frames.
     cmd = [
         "npx", "remotion", "render",
         "src/index.ts",
         _COMPOSITION_ID,
         mp4_path,
-        f"--frames={frames_range}",
         "--codec=h264",
         "--image-format=jpeg",
         "--overwrite",

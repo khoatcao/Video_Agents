@@ -164,6 +164,11 @@ const SCENE_COMPONENTS: Record<string, React.FC<{ scene: SceneData }>> = {
   cta: CTAScene,
 };
 
+export const TOTAL_FRAMES: number = SCENE_DATA.reduce(
+  (sum: number, s: SceneData) => sum + s.duration_frames,
+  0
+);
+
 export const VideoComposition: React.FC = () => {
   let offset = 0;
   return (
