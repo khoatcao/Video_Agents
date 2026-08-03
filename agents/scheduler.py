@@ -60,15 +60,57 @@ _FALLBACK_TOPICS = {
 }
 
 
-def _fetch_trending_headlines(max_headlines: int = 15) -> str:
-    """Fetch recent AI/tech headlines from RSS feeds to ground topic selection."""
+_AI_KEYWORDS = [
+    "ai", "llm", "gpt", "claude", "gemini", "machine learning", "deep learning",
+    "neural", "agent", "chatbot", "openai", "anthropic", "model", "transformer",
+    "diffusion", "generative", "automation", "robot", "nlp", "computer vision",
+    "trí tuệ nhân tạo", "học máy", "mô hình", "tự động hóa",
+]
+
+
+def _fetch_trending_headlines(max_per_source: int = 2, max_total: int = 20) -> str:
+    """
+    Fetch AI-related headlines from RSS feeds, diverse across sources.
+
+    Strategy:
+    1. Filter articles to AI/tech relevant ones using keyword scoring.
+    2. Take top `max_per_source` per source to ensure diversity.
+    3. Sort final list by recency.
+    """
     try:
         from tools.web_search import _fetch_all_feeds
+
         articles = _fetch_all_feeds()
-        # Sort by recency, take top headlines
-        articles.sort(key=lambda a: a["published"], reverse=True)
-        top = articles[:max_headlines]
+        if not articles:
+            return ""
+
+        # Score each article by AI keyword matches
+        def ai_score(article: dict) -> int:
+            text = (article["title"] + " " + article.get("summary", "")).lower()
+            return sum(1 for kw in _AI_KEYWORDS if kw in text)
+
+        # Keep only articles with at least 1 AI keyword match
+        relevant = [a for a in articles if ai_score(a) > 0]
+
+        # If not enough AI articles, fall back to all articles
+        if len(relevant) < 5:
+            relevant = articles
+
+        # Take top max_per_source from each source (by recency)
+        by_source: dict[str, list] = {}
+        for a in sorted(relevant, key=lambda x: x["published"], reverse=True):
+            src = a["source"]
+            by_source.setdefault(src, [])
+            if len(by_source[src]) < max_per_source:
+                by_source[src].append(a)
+
+        # Flatten, sort by recency, cap at max_total
+        diverse = [a for src_articles in by_source.values() for a in src_articles]
+        diverse.sort(key=lambda a: a["published"], reverse=True)
+        top = diverse[:max_total]
+
         lines = [f"- {a['title']} ({a['source']})" for a in top]
+        logger.info("[Scheduler] Selected %d AI headlines from %d sources.", len(top), len(by_source))
         return "\n".join(lines)
     except Exception as exc:
         logger.warning("[Scheduler] RSS fetch for topic planning failed: %s", exc)

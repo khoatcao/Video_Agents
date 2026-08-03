@@ -26,10 +26,14 @@ _RSS_FEEDS = [
     ("The Verge AI",        "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
     ("MIT Tech Review",     "https://www.technologyreview.com/feed/"),
     ("VentureBeat AI",      "https://venturebeat.com/category/ai/feed/"),
+    ("ZDNet AI",            "https://www.zdnet.com/topic/artificial-intelligence/rss.xml"),
+    ("Wired AI",            "https://www.wired.com/feed/tag/ai/latest/rss"),
+    ("Google News AI",      "https://news.google.com/rss/search?q=artificial+intelligence&hl=en-US&gl=US&ceid=US:en"),
     # Vietnamese tech
     ("VnExpress Công nghệ", "https://vnexpress.net/rss/so-hoa.rss"),
     ("VnExpress Khoa học",  "https://vnexpress.net/rss/khoa-hoc.rss"),
     ("Tuoi Tre Công nghệ",  "https://tuoitre.vn/rss/nhip-song-so.rss"),
+    ("Thanh Niên Công nghệ","https://thanhnien.vn/rss/cong-nghe.rss"),
 ]
 
 _FETCH_TIMEOUT = 10   # seconds per feed
