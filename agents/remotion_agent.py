@@ -173,15 +173,24 @@ export const VideoComposition: React.FC = () => {{
 
 
 def _extract_json_array(text: str) -> list[Any]:
-    """Extract first JSON array from LLM response."""
+    """Extract first JSON array from LLM response, handling wrapped objects."""
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
     text = re.sub(r"```(?:json)?\s*", "", text).replace("```", "").strip()
+
+    # Direct parse
     try:
         result = json.loads(text)
         if isinstance(result, list):
             return result
+        # Handle {"scenes": [...]} or {"data": [...]} wrapping
+        if isinstance(result, dict):
+            for val in result.values():
+                if isinstance(val, list) and val:
+                    return val
     except json.JSONDecodeError:
         pass
+
+    # Find bare array in text
     start, end = text.find("["), text.rfind("]")
     if start != -1 and end > start:
         try:
@@ -190,6 +199,7 @@ def _extract_json_array(text: str) -> list[Any]:
                 return result
         except json.JSONDecodeError:
             pass
+
     raise ValueError(f"No JSON array found in LLM response:\n{text[:500]}")
 
 
@@ -239,7 +249,7 @@ def remotion_node(state: PipelineState) -> dict:
         model=MODEL_CODE,
         base_url=OLLAMA_BASE_URL,
         temperature=0.4,
-        format="json",
+        # No format="json" — Ollama JSON mode forces an object {}, not array []
     )
 
     human_prompt = (
@@ -258,6 +268,7 @@ def remotion_node(state: PipelineState) -> dict:
     except Exception as exc:
         return {"error": f"LLM call failed: {exc}", "status": "failed"}
 
+    logger.info("[RemotionAgent] Raw LLM response (%d chars): %s", len(raw), raw[:300])
     try:
         scenes_raw = _extract_json_array(raw)
     except ValueError as exc:
