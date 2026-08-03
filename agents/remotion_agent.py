@@ -2,7 +2,7 @@
 Remotion Agent — template-based video generation.
 
 LLM generates JSON scene config only. Python fills a fixed pre-validated
-TSX template. No TypeScript generation by LLM = no syntax errors.
+TSX template using simple string replacement (no .format() — avoids JSX brace conflicts).
 """
 
 from __future__ import annotations
@@ -28,26 +28,20 @@ _LIVE_COMPOSITION = (
     _PROJECT_ROOT / "remotion" / "src" / "compositions" / "VideoComposition.tsx"
 )
 
-# Fixed, pre-validated TSX template — LLM never touches TypeScript
-_TSX_TEMPLATE = '''import {{ AbsoluteFill, Sequence, useCurrentFrame, interpolate, spring }} from 'remotion';
+# __SCENE_DATA__ is replaced via .replace() — no .format() so JSX braces are safe
+_TSX_TEMPLATE = """import { AbsoluteFill, Sequence, useCurrentFrame, interpolate, spring } from 'remotion';
 import React from 'react';
 
-const SCENE_DATA = {scene_data_json};
+const SCENE_DATA = __SCENE_DATA__;
 
-const THEME = {{
+const THEME = {
   bg: '#0f172a',
   surface: '#1e293b',
   text: '#f8fafc',
   muted: '#94a3b8',
-}};
+};
 
-const FadeIn: React.FC<{{ frame: number; delay?: number; children: React.ReactNode }}> = ({{ frame, delay = 0, children }}) => {{
-  const opacity = interpolate(frame - delay, [0, 15], [0, 1], {{ extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }});
-  const y = interpolate(frame - delay, [0, 15], [30, 0], {{ extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }});
-  return <div style={{{{ opacity, transform: `translateY(${{y}}px)` }}}}>{children}</div>;
-}};
-
-type SceneData = {{
+type SceneData = {
   heading: string;
   subheading?: string | null;
   bullets?: string[] | null;
@@ -55,121 +49,139 @@ type SceneData = {{
   accent_color: string;
   duration_frames: number;
   scene_type: string;
-}};
+};
 
-const TitleScene: React.FC<{{ scene: SceneData }}> = ({{ scene }}) => {{
+const FadeIn: React.FC<{ frame: number; delay?: number; children: React.ReactNode }> = ({ frame, delay = 0, children }) => {
+  const opacity = interpolate(frame - delay, [0, 15], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const y = interpolate(frame - delay, [0, 15], [30, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  return <div style={{ opacity, transform: `translateY(${y}px)` }}>{children}</div>;
+};
+
+const TitleScene: React.FC<{ scene: SceneData }> = ({ scene }) => {
   const frame = useCurrentFrame();
   return (
-    <AbsoluteFill style={{{{ backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center', padding: 60, flexDirection: 'column', gap: 24 }}}}>
-      <FadeIn frame={{frame}}>
-        <h1 style={{{{ color: THEME.text, fontSize: 80, fontWeight: 700, textAlign: 'center', lineHeight: 1.2, margin: 0, fontFamily: 'system-ui' }}}}>{scene.heading}</h1>
+    <AbsoluteFill style={{ backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center', padding: 60, flexDirection: 'column', gap: 24 }}>
+      <FadeIn frame={frame}>
+        <h1 style={{ color: THEME.text, fontSize: 80, fontWeight: 700, textAlign: 'center', lineHeight: 1.2, margin: 0, fontFamily: 'system-ui' }}>
+          {scene.heading}
+        </h1>
       </FadeIn>
-      {{scene.subheading && (
-        <FadeIn frame={{frame}} delay={{15}}>
-          <p style={{{{ color: THEME.muted, fontSize: 44, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}}}>{scene.subheading}</p>
+      {scene.subheading && (
+        <FadeIn frame={frame} delay={15}>
+          <p style={{ color: THEME.muted, fontSize: 44, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}>
+            {scene.subheading}
+          </p>
         </FadeIn>
-      )}}
-      <FadeIn frame={{frame}} delay={{25}}>
-        <div style={{{{ height: 6, backgroundColor: scene.accent_color, width: 200, borderRadius: 3 }}}} />
+      )}
+      <FadeIn frame={frame} delay={25}>
+        <div style={{ height: 6, backgroundColor: scene.accent_color, width: 200, borderRadius: 3 }} />
       </FadeIn>
     </AbsoluteFill>
   );
-}};
+};
 
-const BulletsScene: React.FC<{{ scene: SceneData }}> = ({{ scene }}) => {{
+const BulletsScene: React.FC<{ scene: SceneData }> = ({ scene }) => {
   const frame = useCurrentFrame();
   const items = scene.bullets || scene.steps || [];
   return (
-    <AbsoluteFill style={{{{ backgroundColor: THEME.bg, padding: 80, flexDirection: 'column', justifyContent: 'center', gap: 36 }}}}>
-      <FadeIn frame={{frame}}>
-        <h2 style={{{{ color: THEME.text, fontSize: 68, fontWeight: 700, margin: 0, lineHeight: 1.2, fontFamily: 'system-ui' }}}}>{scene.heading}</h2>
-        <div style={{{{ height: 4, backgroundColor: scene.accent_color, width: 120, marginTop: 16, borderRadius: 2 }}}} />
+    <AbsoluteFill style={{ backgroundColor: THEME.bg, padding: 80, flexDirection: 'column', justifyContent: 'center', gap: 36 }}>
+      <FadeIn frame={frame}>
+        <h2 style={{ color: THEME.text, fontSize: 68, fontWeight: 700, margin: 0, lineHeight: 1.2, fontFamily: 'system-ui' }}>
+          {scene.heading}
+        </h2>
+        <div style={{ height: 4, backgroundColor: scene.accent_color, width: 120, marginTop: 16, borderRadius: 2 }} />
       </FadeIn>
-      {{items.map((item, i) => (
-        <FadeIn key={{i}} frame={{frame}} delay={{15 + i * 12}}>
-          <div style={{{{ display: 'flex', alignItems: 'center', gap: 24 }}}}>
-            <div style={{{{ width: 14, height: 14, borderRadius: '50%', backgroundColor: scene.accent_color, flexShrink: 0 }}}} />
-            <p style={{{{ color: THEME.text, fontSize: 48, margin: 0, lineHeight: 1.4, fontFamily: 'system-ui' }}}}>{item}</p>
+      {items.map((item, i) => (
+        <FadeIn key={i} frame={frame} delay={15 + i * 12}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <div style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: scene.accent_color, flexShrink: 0 }} />
+            <p style={{ color: THEME.text, fontSize: 48, margin: 0, lineHeight: 1.4, fontFamily: 'system-ui' }}>{item}</p>
           </div>
         </FadeIn>
-      ))}}
+      ))}
     </AbsoluteFill>
   );
-}};
+};
 
-const DiagramScene: React.FC<{{ scene: SceneData }}> = ({{ scene }}) => {{
+const DiagramScene: React.FC<{ scene: SceneData }> = ({ scene }) => {
   const frame = useCurrentFrame();
   const steps = scene.steps || scene.bullets || [];
   return (
-    <AbsoluteFill style={{{{ backgroundColor: THEME.bg, padding: 80, flexDirection: 'column', justifyContent: 'center', gap: 28 }}}}>
-      <FadeIn frame={{frame}}>
-        <h2 style={{{{ color: THEME.text, fontSize: 68, fontWeight: 700, margin: 0, fontFamily: 'system-ui' }}}}>{scene.heading}</h2>
-        <div style={{{{ height: 4, backgroundColor: scene.accent_color, width: 120, marginTop: 16, borderRadius: 2 }}}} />
+    <AbsoluteFill style={{ backgroundColor: THEME.bg, padding: 80, flexDirection: 'column', justifyContent: 'center', gap: 28 }}>
+      <FadeIn frame={frame}>
+        <h2 style={{ color: THEME.text, fontSize: 68, fontWeight: 700, margin: 0, fontFamily: 'system-ui' }}>
+          {scene.heading}
+        </h2>
+        <div style={{ height: 4, backgroundColor: scene.accent_color, width: 120, marginTop: 16, borderRadius: 2 }} />
       </FadeIn>
-      {{steps.map((step, i) => {{
-        const scale = spring({{ frame: frame - (20 + i * 18), fps: 30, config: {{ damping: 12 }} }});
+      {steps.map((step, i) => {
+        const scale = spring({ frame: frame - (20 + i * 18), fps: 30, config: { damping: 12 } });
         return (
-          <div key={{i}} style={{{{ transform: `scale(${{scale}})`, backgroundColor: THEME.surface, borderLeft: `6px solid ${{scene.accent_color}}`, padding: '24px 36px', borderRadius: 12 }}}}>
-            <span style={{{{ color: THEME.muted, fontSize: 30, fontWeight: 600, fontFamily: 'system-ui' }}}}>0{{i + 1}}</span>
-            <p style={{{{ color: THEME.text, fontSize: 50, fontWeight: 700, margin: '8px 0 0', fontFamily: 'system-ui' }}}}>{step}</p>
+          <div key={i} style={{ transform: `scale(${scale})`, backgroundColor: THEME.surface, borderLeft: `6px solid ${scene.accent_color}`, padding: '24px 36px', borderRadius: 12 }}>
+            <span style={{ color: THEME.muted, fontSize: 30, fontWeight: 600, fontFamily: 'system-ui' }}>0{i + 1}</span>
+            <p style={{ color: THEME.text, fontSize: 50, fontWeight: 700, margin: '8px 0 0', fontFamily: 'system-ui' }}>{step}</p>
           </div>
         );
-      }}))}}
+      })}
     </AbsoluteFill>
   );
-}};
+};
 
-const CTAScene: React.FC<{{ scene: SceneData }}> = ({{ scene }}) => {{
+const CTAScene: React.FC<{ scene: SceneData }> = ({ scene }) => {
   const frame = useCurrentFrame();
   return (
-    <AbsoluteFill style={{{{ backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 32, padding: 60 }}}}>
-      <FadeIn frame={{frame}}>
-        <div style={{{{ fontSize: 120, textAlign: 'center' }}}}>🤖</div>
+    <AbsoluteFill style={{ backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 32, padding: 60 }}>
+      <FadeIn frame={frame}>
+        <div style={{ fontSize: 120, textAlign: 'center' }}>🤖</div>
       </FadeIn>
-      <FadeIn frame={{frame}} delay={{15}}>
-        <h1 style={{{{ color: THEME.text, fontSize: 72, fontWeight: 700, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}}}>{scene.heading}</h1>
+      <FadeIn frame={frame} delay={15}>
+        <h1 style={{ color: THEME.text, fontSize: 72, fontWeight: 700, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}>
+          {scene.heading}
+        </h1>
       </FadeIn>
-      {{scene.subheading && (
-        <FadeIn frame={{frame}} delay={{28}}>
-          <p style={{{{ color: THEME.muted, fontSize: 44, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}}}>{scene.subheading}</p>
+      {scene.subheading && (
+        <FadeIn frame={frame} delay={28}>
+          <p style={{ color: THEME.muted, fontSize: 44, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}>
+            {scene.subheading}
+          </p>
         </FadeIn>
-      )}}
-      <FadeIn frame={{frame}} delay={{40}}>
-        <div style={{{{ backgroundColor: scene.accent_color, paddingInline: 60, paddingBlock: 24, borderRadius: 60 }}}}>
-          <p style={{{{ color: '#fff', fontSize: 44, fontWeight: 700, margin: 0, fontFamily: 'system-ui' }}}}>Theo dõi ngay! 👆</p>
+      )}
+      <FadeIn frame={frame} delay={40}>
+        <div style={{ backgroundColor: scene.accent_color, paddingInline: 60, paddingBlock: 24, borderRadius: 60 }}>
+          <p style={{ color: '#fff', fontSize: 44, fontWeight: 700, margin: 0, fontFamily: 'system-ui' }}>Theo dõi ngay! 👆</p>
         </div>
       </FadeIn>
     </AbsoluteFill>
   );
-}};
+};
 
-const SCENE_COMPONENTS: Record<string, React.FC<{{ scene: SceneData }}>> = {{
+const SCENE_COMPONENTS: Record<string, React.FC<{ scene: SceneData }>> = {
   title: TitleScene,
   bullets: BulletsScene,
   diagram: DiagramScene,
   flow_chart: DiagramScene,
   comparison: BulletsScene,
   cta: CTAScene,
-}};
+};
 
-export const VideoComposition: React.FC = () => {{
+export const VideoComposition: React.FC = () => {
   let offset = 0;
   return (
     <AbsoluteFill>
-      {{SCENE_DATA.map((scene, i) => {{
+      {SCENE_DATA.map((scene, i) => {
         const from = offset;
         offset += scene.duration_frames;
         const Component = SCENE_COMPONENTS[scene.scene_type] || BulletsScene;
         return (
-          <Sequence key={{i}} from={{from}} durationInFrames={{scene.duration_frames}}>
-            <Component scene={{scene}} />
+          <Sequence key={i} from={from} durationInFrames={scene.duration_frames}>
+            <Component scene={scene} />
           </Sequence>
         );
-      }})}}
+      })}
     </AbsoluteFill>
   );
-}};
-'''
+};
+"""
 
 
 def _extract_json_array(text: str) -> list[Any]:
@@ -177,12 +189,10 @@ def _extract_json_array(text: str) -> list[Any]:
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
     text = re.sub(r"```(?:json)?\s*", "", text).replace("```", "").strip()
 
-    # Direct parse
     try:
         result = json.loads(text)
         if isinstance(result, list):
             return result
-        # Handle {"scenes": [...]} or {"data": [...]} wrapping
         if isinstance(result, dict):
             for val in result.values():
                 if isinstance(val, list) and val:
@@ -190,7 +200,6 @@ def _extract_json_array(text: str) -> list[Any]:
     except json.JSONDecodeError:
         pass
 
-    # Find bare array in text
     start, end = text.find("["), text.rfind("]")
     if start != -1 and end > start:
         try:
@@ -204,7 +213,7 @@ def _extract_json_array(text: str) -> list[Any]:
 
 
 def _validate_scenes(scenes: list[Any]) -> list[dict]:
-    """Validate and normalise scene objects, filling defaults where needed."""
+    """Validate and normalise scene objects."""
     valid_types = {"title", "bullets", "diagram", "flow_chart", "comparison", "cta"}
     valid_colors = {"#3b82f6", "#10b981", "#f59e0b", "#ef4444"}
     result = []
@@ -224,23 +233,17 @@ def _validate_scenes(scenes: list[Any]) -> list[dict]:
 
 
 def _build_tsx(scenes: list[dict]) -> str:
-    """Fill the TSX template with validated scene data."""
+    """Fill the TSX template — simple replace, no .format() to avoid JSX brace conflicts."""
     scene_json = json.dumps(scenes, ensure_ascii=False, indent=2)
-    return _TSX_TEMPLATE.format(scene_data_json=scene_json)
+    return _TSX_TEMPLATE.replace("__SCENE_DATA__", scene_json)
 
 
 def remotion_node(state: PipelineState) -> dict:
     """
     LangGraph node: generate VideoComposition.tsx from scene_plan.
-
     LLM generates JSON scene config → Python fills TSX template.
-    No TypeScript written by LLM = no syntax errors.
-
-    Reads:  state["scene_plan"]
-    Writes: remotion_project_path  — or — error, status
     """
     scene_plan = state.get("scene_plan", [])
-    slot = state.get("slot", "morning")
 
     if not scene_plan:
         return {"error": "scene_plan is empty.", "status": "failed"}
@@ -249,13 +252,12 @@ def remotion_node(state: PipelineState) -> dict:
         model=MODEL_CODE,
         base_url=OLLAMA_BASE_URL,
         temperature=0.4,
-        # No format="json" — Ollama JSON mode forces an object {}, not array []
     )
 
     human_prompt = (
         "Convert this scene plan into a JSON array of scene config objects.\n\n"
         f"SCENE PLAN:\n{json.dumps(scene_plan, ensure_ascii=False, indent=2)}\n\n"
-        "Return ONLY a valid JSON array."
+        "Return ONLY a valid JSON array. No explanation, no markdown."
     )
 
     logger.info("[RemotionAgent] Invoking %s for %d scenes …", MODEL_CODE, len(scene_plan))
@@ -268,7 +270,8 @@ def remotion_node(state: PipelineState) -> dict:
     except Exception as exc:
         return {"error": f"LLM call failed: {exc}", "status": "failed"}
 
-    logger.info("[RemotionAgent] Raw LLM response (%d chars): %s", len(raw), raw[:300])
+    logger.info("[RemotionAgent] Raw response (%d chars): %s", len(raw), raw[:300])
+
     try:
         scenes_raw = _extract_json_array(raw)
     except ValueError as exc:
@@ -279,15 +282,13 @@ def remotion_node(state: PipelineState) -> dict:
     if not scenes:
         return {"error": "LLM returned no valid scenes.", "status": "failed"}
 
-    # Ensure first=title, last=cta
     scenes[0]["scene_type"] = "title"
     scenes[-1]["scene_type"] = "cta"
 
     tsx = _build_tsx(scenes)
     total_frames = sum(s["duration_frames"] for s in scenes)
-    logger.info("[RemotionAgent] Generated %d scenes, %d total frames.", len(scenes), total_frames)
+    logger.info("[RemotionAgent] %d scenes, %d total frames.", len(scenes), total_frames)
 
-    # Archive copy
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive_dir = OUTPUT_DIR / "compositions"
     archive_dir.mkdir(parents=True, exist_ok=True)
@@ -295,7 +296,6 @@ def remotion_node(state: PipelineState) -> dict:
     archive_path.write_text(tsx, encoding="utf-8")
     logger.info("[RemotionAgent] Archived → %s", archive_path)
 
-    # Write live composition
     _LIVE_COMPOSITION.parent.mkdir(parents=True, exist_ok=True)
     _LIVE_COMPOSITION.write_text(tsx, encoding="utf-8")
     logger.info("[RemotionAgent] Live composition written → %s", _LIVE_COMPOSITION)
