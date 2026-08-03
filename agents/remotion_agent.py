@@ -1,9 +1,8 @@
 """
-Remotion Agent for the LangGraph video-generation pipeline.
+Remotion Agent — template-based video generation.
 
-Takes scene_plan from state, calls qwen2.5:7b to generate a self-contained
-VideoComposition.tsx, validates it with tsc, repairs up to 3 times on error,
-then writes it to the live Remotion compositions folder.
+LLM generates JSON scene config only. Python fills a fixed pre-validated
+TSX template. No TypeScript generation by LLM = no syntax errors.
 """
 
 from __future__ import annotations
@@ -11,9 +10,9 @@ from __future__ import annotations
 import json
 import logging
 import re
-import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
@@ -25,158 +24,209 @@ from state.pipeline_state import PipelineState
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_REMOTION_ROOT = _PROJECT_ROOT / "remotion"
-_LIVE_COMPOSITION = _REMOTION_ROOT / "src" / "compositions" / "VideoComposition.tsx"
-_MAX_REPAIR_ATTEMPTS = 2
-_TSC_TIMEOUT = 90
+_LIVE_COMPOSITION = (
+    _PROJECT_ROOT / "remotion" / "src" / "compositions" / "VideoComposition.tsx"
+)
+
+# Fixed, pre-validated TSX template — LLM never touches TypeScript
+_TSX_TEMPLATE = '''import {{ AbsoluteFill, Sequence, useCurrentFrame, interpolate, spring }} from 'remotion';
+import React from 'react';
+
+const SCENE_DATA = {scene_data_json};
+
+const THEME = {{
+  bg: '#0f172a',
+  surface: '#1e293b',
+  text: '#f8fafc',
+  muted: '#94a3b8',
+}};
+
+const FadeIn: React.FC<{{ frame: number; delay?: number; children: React.ReactNode }}> = ({{ frame, delay = 0, children }}) => {{
+  const opacity = interpolate(frame - delay, [0, 15], [0, 1], {{ extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }});
+  const y = interpolate(frame - delay, [0, 15], [30, 0], {{ extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }});
+  return <div style={{{{ opacity, transform: `translateY(${{y}}px)` }}}}>{children}</div>;
+}};
+
+type SceneData = {{
+  heading: string;
+  subheading?: string | null;
+  bullets?: string[] | null;
+  steps?: string[] | null;
+  accent_color: string;
+  duration_frames: number;
+  scene_type: string;
+}};
+
+const TitleScene: React.FC<{{ scene: SceneData }}> = ({{ scene }}) => {{
+  const frame = useCurrentFrame();
+  return (
+    <AbsoluteFill style={{{{ backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center', padding: 60, flexDirection: 'column', gap: 24 }}}}>
+      <FadeIn frame={{frame}}>
+        <h1 style={{{{ color: THEME.text, fontSize: 80, fontWeight: 700, textAlign: 'center', lineHeight: 1.2, margin: 0, fontFamily: 'system-ui' }}}}>{scene.heading}</h1>
+      </FadeIn>
+      {{scene.subheading && (
+        <FadeIn frame={{frame}} delay={{15}}>
+          <p style={{{{ color: THEME.muted, fontSize: 44, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}}}>{scene.subheading}</p>
+        </FadeIn>
+      )}}
+      <FadeIn frame={{frame}} delay={{25}}>
+        <div style={{{{ height: 6, backgroundColor: scene.accent_color, width: 200, borderRadius: 3 }}}} />
+      </FadeIn>
+    </AbsoluteFill>
+  );
+}};
+
+const BulletsScene: React.FC<{{ scene: SceneData }}> = ({{ scene }}) => {{
+  const frame = useCurrentFrame();
+  const items = scene.bullets || scene.steps || [];
+  return (
+    <AbsoluteFill style={{{{ backgroundColor: THEME.bg, padding: 80, flexDirection: 'column', justifyContent: 'center', gap: 36 }}}}>
+      <FadeIn frame={{frame}}>
+        <h2 style={{{{ color: THEME.text, fontSize: 68, fontWeight: 700, margin: 0, lineHeight: 1.2, fontFamily: 'system-ui' }}}}>{scene.heading}</h2>
+        <div style={{{{ height: 4, backgroundColor: scene.accent_color, width: 120, marginTop: 16, borderRadius: 2 }}}} />
+      </FadeIn>
+      {{items.map((item, i) => (
+        <FadeIn key={{i}} frame={{frame}} delay={{15 + i * 12}}>
+          <div style={{{{ display: 'flex', alignItems: 'center', gap: 24 }}}}>
+            <div style={{{{ width: 14, height: 14, borderRadius: '50%', backgroundColor: scene.accent_color, flexShrink: 0 }}}} />
+            <p style={{{{ color: THEME.text, fontSize: 48, margin: 0, lineHeight: 1.4, fontFamily: 'system-ui' }}}}>{item}</p>
+          </div>
+        </FadeIn>
+      ))}}
+    </AbsoluteFill>
+  );
+}};
+
+const DiagramScene: React.FC<{{ scene: SceneData }}> = ({{ scene }}) => {{
+  const frame = useCurrentFrame();
+  const steps = scene.steps || scene.bullets || [];
+  return (
+    <AbsoluteFill style={{{{ backgroundColor: THEME.bg, padding: 80, flexDirection: 'column', justifyContent: 'center', gap: 28 }}}}>
+      <FadeIn frame={{frame}}>
+        <h2 style={{{{ color: THEME.text, fontSize: 68, fontWeight: 700, margin: 0, fontFamily: 'system-ui' }}}}>{scene.heading}</h2>
+        <div style={{{{ height: 4, backgroundColor: scene.accent_color, width: 120, marginTop: 16, borderRadius: 2 }}}} />
+      </FadeIn>
+      {{steps.map((step, i) => {{
+        const scale = spring({{ frame: frame - (20 + i * 18), fps: 30, config: {{ damping: 12 }} }});
+        return (
+          <div key={{i}} style={{{{ transform: `scale(${{scale}})`, backgroundColor: THEME.surface, borderLeft: `6px solid ${{scene.accent_color}}`, padding: '24px 36px', borderRadius: 12 }}}}>
+            <span style={{{{ color: THEME.muted, fontSize: 30, fontWeight: 600, fontFamily: 'system-ui' }}}}>0{{i + 1}}</span>
+            <p style={{{{ color: THEME.text, fontSize: 50, fontWeight: 700, margin: '8px 0 0', fontFamily: 'system-ui' }}}}>{step}</p>
+          </div>
+        );
+      }}))}}
+    </AbsoluteFill>
+  );
+}};
+
+const CTAScene: React.FC<{{ scene: SceneData }}> = ({{ scene }}) => {{
+  const frame = useCurrentFrame();
+  return (
+    <AbsoluteFill style={{{{ backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 32, padding: 60 }}}}>
+      <FadeIn frame={{frame}}>
+        <div style={{{{ fontSize: 120, textAlign: 'center' }}}}>🤖</div>
+      </FadeIn>
+      <FadeIn frame={{frame}} delay={{15}}>
+        <h1 style={{{{ color: THEME.text, fontSize: 72, fontWeight: 700, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}}}>{scene.heading}</h1>
+      </FadeIn>
+      {{scene.subheading && (
+        <FadeIn frame={{frame}} delay={{28}}>
+          <p style={{{{ color: THEME.muted, fontSize: 44, textAlign: 'center', margin: 0, fontFamily: 'system-ui' }}}}>{scene.subheading}</p>
+        </FadeIn>
+      )}}
+      <FadeIn frame={{frame}} delay={{40}}>
+        <div style={{{{ backgroundColor: scene.accent_color, paddingInline: 60, paddingBlock: 24, borderRadius: 60 }}}}>
+          <p style={{{{ color: '#fff', fontSize: 44, fontWeight: 700, margin: 0, fontFamily: 'system-ui' }}}}>Theo dõi ngay! 👆</p>
+        </div>
+      </FadeIn>
+    </AbsoluteFill>
+  );
+}};
+
+const SCENE_COMPONENTS: Record<string, React.FC<{{ scene: SceneData }}>> = {{
+  title: TitleScene,
+  bullets: BulletsScene,
+  diagram: DiagramScene,
+  flow_chart: DiagramScene,
+  comparison: BulletsScene,
+  cta: CTAScene,
+}};
+
+export const VideoComposition: React.FC = () => {{
+  let offset = 0;
+  return (
+    <AbsoluteFill>
+      {{SCENE_DATA.map((scene, i) => {{
+        const from = offset;
+        offset += scene.duration_frames;
+        const Component = SCENE_COMPONENTS[scene.scene_type] || BulletsScene;
+        return (
+          <Sequence key={{i}} from={{from}} durationInFrames={{scene.duration_frames}}>
+            <Component scene={{scene}} />
+          </Sequence>
+        );
+      }})}}
+    </AbsoluteFill>
+  );
+}};
+'''
 
 
-# ── TSX extraction ────────────────────────────────────────────────────────────
-
-def _extract_tsx(text: str) -> str:
-    """Extract TypeScript/TSX code from LLM response."""
-    if not text:
-        raise ValueError("LLM returned an empty response.")
-
-    for pattern in [
-        r"```tsx\s*([\s\S]*?)```",
-        r"```typescript\s*([\s\S]*?)```",
-        r"```ts\s*([\s\S]*?)```",
-        r"```\s*([\s\S]*?)```",
-    ]:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            code = match.group(1).strip()
-            if code:
-                return code
-
-    stripped = text.strip()
-    stripped = re.sub(r"^```(?:tsx|typescript|ts)?\s*", "", stripped, flags=re.IGNORECASE)
-    stripped = re.sub(r"\s*```$", "", stripped).strip()
-
-    if any(stripped.startswith(p) for p in ("import ", "export ", "//", "const ")):
-        return stripped
-
-    raise ValueError(f"Could not extract TSX from LLM response:\n{stripped[:500]}")
-
-
-# ── Validation ────────────────────────────────────────────────────────────────
-
-def _basic_validate(tsx: str) -> tuple[bool, str]:
-    """Fast pre-checks before running tsc."""
-    checks = [
-        (bool(tsx.strip()),                              "TSX is empty."),
-        ("VideoComposition" in tsx,                      "Missing VideoComposition."),
-        ("export const VideoComposition" in tsx,         "Missing 'export const VideoComposition'."),
-        ("export" in tsx,                                "No export found."),
-        ("```" not in tsx,                               "TSX still contains markdown fences."),
-    ]
-    forbidden = ["./components", "../components", "./utils", "../utils",
-                 "./scene", "../scene", "./helpers", "../helpers"]
-    for imp in forbidden:
-        checks.append((imp not in tsx, f"Forbidden local import: {imp}"))
-
-    for ok, msg in checks:
-        if not ok:
-            return False, msg
-    return True, ""
-
-
-def _tsc_validate(tsx: str) -> tuple[bool, str]:
-    """Write TSX to live path, run tsc --noEmit, restore original."""
-    ok, msg = _basic_validate(tsx)
-    if not ok:
-        return False, msg
-
-    if not _REMOTION_ROOT.exists() or not (_REMOTION_ROOT / "package.json").exists():
-        return False, f"Remotion project not found at {_REMOTION_ROOT}"
-
-    _LIVE_COMPOSITION.parent.mkdir(parents=True, exist_ok=True)
-    backup = _LIVE_COMPOSITION.with_suffix(".tsx.__backup__")
-    had_original = _LIVE_COMPOSITION.exists()
-
+def _extract_json_array(text: str) -> list[Any]:
+    """Extract first JSON array from LLM response."""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    text = re.sub(r"```(?:json)?\s*", "", text).replace("```", "").strip()
     try:
-        if had_original:
-            backup.write_bytes(_LIVE_COMPOSITION.read_bytes())
-
-        _LIVE_COMPOSITION.write_text(tsx, encoding="utf-8")
-
-        result = subprocess.run(
-            ["npx", "tsc", "--noEmit", "--pretty", "false"],
-            cwd=_REMOTION_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=_TSC_TIMEOUT,
-        )
-
-        if result.returncode == 0:
-            return True, ""
-
-        error = result.stdout.strip() or result.stderr.strip() or "tsc failed."
-        return False, error
-
-    except FileNotFoundError:
-        return False, "npx/Node.js not found. Run: cd remotion && npm install"
-    except subprocess.TimeoutExpired:
-        return False, f"tsc timed out after {_TSC_TIMEOUT}s."
-    except Exception as exc:
-        return False, f"Validation error: {exc}"
-    finally:
+        result = json.loads(text)
+        if isinstance(result, list):
+            return result
+    except json.JSONDecodeError:
+        pass
+    start, end = text.find("["), text.rfind("]")
+    if start != -1 and end > start:
         try:
-            if had_original and backup.exists():
-                _LIVE_COMPOSITION.write_bytes(backup.read_bytes())
-            elif not had_original:
-                _LIVE_COMPOSITION.unlink(missing_ok=True)
-        except Exception as e:
-            logger.error("[RemotionAgent] Failed to restore backup: %s", e)
-        backup.unlink(missing_ok=True)
+            result = json.loads(text[start:end + 1])
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+    raise ValueError(f"No JSON array found in LLM response:\n{text[:500]}")
 
 
-# ── LLM helpers ───────────────────────────────────────────────────────────────
-
-def _invoke_llm(llm: ChatOllama, messages: list) -> str:
-    response = llm.invoke(messages)
-    content = getattr(response, "content", response)
-    if isinstance(content, list):
-        return "\n".join(str(item.get("text", item)) if isinstance(item, dict) else str(item)
-                         for item in content)
-    return str(content)
-
-
-def _generation_prompt(scene_plan: list) -> str:
-    scene_json = json.dumps(scene_plan, ensure_ascii=False, indent=2)
-    return (
-        "Generate a complete, self-contained Remotion VideoComposition.tsx "
-        "for the scene plan below.\n\n"
-        "SCENE PLAN:\n"
-        f"{scene_json}\n\n"
-        "REQUIREMENTS:\n"
-        "- Export: export const VideoComposition = () => { ... }\n"
-        "- Only import from 'remotion' and 'react' — no local file imports\n"
-        "- Use AbsoluteFill, Sequence, useCurrentFrame, interpolate, spring\n"
-        "- Video: 1080x1920 (9:16), 30fps, dark background (#0f172a)\n"
-        "- ByteByteGo style: bold text, colored boxes, smooth animations\n"
-        "- All text in Vietnamese\n"
-        "Return ONLY the TSX code inside a ```tsx block."
-    )
+def _validate_scenes(scenes: list[Any]) -> list[dict]:
+    """Validate and normalise scene objects, filling defaults where needed."""
+    valid_types = {"title", "bullets", "diagram", "flow_chart", "comparison", "cta"}
+    valid_colors = {"#3b82f6", "#10b981", "#f59e0b", "#ef4444"}
+    result = []
+    for i, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            continue
+        result.append({
+            "heading":        str(scene.get("heading", f"Scene {i + 1}")),
+            "subheading":     scene.get("subheading") or None,
+            "bullets":        scene.get("bullets") or None,
+            "steps":          scene.get("steps") or None,
+            "accent_color":   scene.get("accent_color", "#3b82f6") if scene.get("accent_color") in valid_colors else "#3b82f6",
+            "duration_frames": max(60, int(scene.get("duration_frames", 90))),
+            "scene_type":     scene.get("scene_type", "bullets") if scene.get("scene_type") in valid_types else "bullets",
+        })
+    return result
 
 
-def _repair_prompt(tsx: str, error: str) -> str:
-    return (
-        "The Remotion composition failed TypeScript validation. Fix ALL errors.\n\n"
-        f"COMPILER ERROR:\n{error}\n\n"
-        f"CURRENT TSX:\n```tsx\n{tsx}\n```\n\n"
-        "Return ONLY the corrected TSX inside a ```tsx block."
-    )
+def _build_tsx(scenes: list[dict]) -> str:
+    """Fill the TSX template with validated scene data."""
+    scene_json = json.dumps(scenes, ensure_ascii=False, indent=2)
+    return _TSX_TEMPLATE.format(scene_data_json=scene_json)
 
-
-# ── Main node ─────────────────────────────────────────────────────────────────
 
 def remotion_node(state: PipelineState) -> dict:
     """
     LangGraph node: generate VideoComposition.tsx from scene_plan.
 
-    Reads:  state["scene_plan"], state["slot"]
+    LLM generates JSON scene config → Python fills TSX template.
+    No TypeScript written by LLM = no syntax errors.
+
+    Reads:  state["scene_plan"]
     Writes: remotion_project_path  — or — error, status
     """
     scene_plan = state.get("scene_plan", [])
@@ -189,48 +239,42 @@ def remotion_node(state: PipelineState) -> dict:
         model=MODEL_CODE,
         base_url=OLLAMA_BASE_URL,
         temperature=0.4,
+        format="json",
+    )
+
+    human_prompt = (
+        "Convert this scene plan into a JSON array of scene config objects.\n\n"
+        f"SCENE PLAN:\n{json.dumps(scene_plan, ensure_ascii=False, indent=2)}\n\n"
+        "Return ONLY a valid JSON array."
     )
 
     logger.info("[RemotionAgent] Invoking %s for %d scenes …", MODEL_CODE, len(scene_plan))
-
-    messages = [
-        SystemMessage(content=REMOTION_AGENT_SYSTEM_PROMPT),
-        HumanMessage(content=_generation_prompt(scene_plan)),
-    ]
-
     try:
-        raw = _invoke_llm(llm, messages)
+        response = llm.invoke([
+            SystemMessage(content=REMOTION_AGENT_SYSTEM_PROMPT),
+            HumanMessage(content=human_prompt),
+        ])
+        raw = response.content if hasattr(response, "content") else str(response)
     except Exception as exc:
         return {"error": f"LLM call failed: {exc}", "status": "failed"}
 
     try:
-        tsx = _extract_tsx(raw)
+        scenes_raw = _extract_json_array(raw)
     except ValueError as exc:
+        logger.error("[RemotionAgent] JSON parse failed: %s", exc)
         return {"error": str(exc), "status": "failed"}
 
-    # Validate and repair loop
-    for attempt in range(_MAX_REPAIR_ATTEMPTS + 1):
-        valid, error = _tsc_validate(tsx)
-        if valid:
-            break
+    scenes = _validate_scenes(scenes_raw)
+    if not scenes:
+        return {"error": "LLM returned no valid scenes.", "status": "failed"}
 
-        if attempt == _MAX_REPAIR_ATTEMPTS:
-            logger.warning(
-                "[RemotionAgent] tsc still failing after %d repairs — using last version anyway.",
-                _MAX_REPAIR_ATTEMPTS,
-            )
-            break
+    # Ensure first=title, last=cta
+    scenes[0]["scene_type"] = "title"
+    scenes[-1]["scene_type"] = "cta"
 
-        logger.warning("[RemotionAgent] tsc error (attempt %d): %s", attempt + 1, error[:200])
-        try:
-            raw = _invoke_llm(llm, [
-                SystemMessage(content=REMOTION_AGENT_SYSTEM_PROMPT),
-                HumanMessage(content=_repair_prompt(tsx, error)),
-            ])
-            tsx = _extract_tsx(raw)
-        except Exception as exc:
-            logger.warning("[RemotionAgent] Repair attempt %d failed: %s", attempt + 1, exc)
-            break
+    tsx = _build_tsx(scenes)
+    total_frames = sum(s["duration_frames"] for s in scenes)
+    logger.info("[RemotionAgent] Generated %d scenes, %d total frames.", len(scenes), total_frames)
 
     # Archive copy
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -238,12 +282,11 @@ def remotion_node(state: PipelineState) -> dict:
     archive_dir.mkdir(parents=True, exist_ok=True)
     archive_path = archive_dir / f"VideoComposition_{timestamp}.tsx"
     archive_path.write_text(tsx, encoding="utf-8")
-    logger.info("[RemotionAgent] Archived composition → %s", archive_path)
+    logger.info("[RemotionAgent] Archived → %s", archive_path)
 
-    # Write live composition for Remotion to render
+    # Write live composition
     _LIVE_COMPOSITION.parent.mkdir(parents=True, exist_ok=True)
     _LIVE_COMPOSITION.write_text(tsx, encoding="utf-8")
-    logger.info("[RemotionAgent] Live composition overwritten → %s", _LIVE_COMPOSITION)
+    logger.info("[RemotionAgent] Live composition written → %s", _LIVE_COMPOSITION)
 
-    logger.info("[RemotionAgent] Done. remotion_project_path=%s", archive_path)
     return {"remotion_project_path": str(archive_path), "error": None}
