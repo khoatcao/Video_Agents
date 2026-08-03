@@ -19,7 +19,9 @@ Rules:
 - Last scene must be "cta" type
 - Middle scenes use "bullets", "diagram", or "flow_chart"
 - bullets/steps: max 4 items, each max 50 chars
+- duration_frames per scene: minimum 240 (8s), recommended 270-360 (9-12s)
 - Total duration_frames: between 1350 and 1800 (45-60 seconds at 30fps)
+- With 5 scenes: each scene should be ~300 frames (10s). With 6 scenes: ~250 frames each.
 - All text must be in Vietnamese
 - Return ONLY a valid JSON array, no explanation, no markdown fences
 """

@@ -217,8 +217,13 @@ def _extract_json_array(text: str) -> list[Any]:
     raise ValueError(f"No JSON array found in LLM response:\n{text[:500]}")
 
 
+_MIN_TOTAL_FRAMES = 1350   # 45 s at 30 fps
+_MAX_TOTAL_FRAMES = 1800   # 60 s at 30 fps
+_MIN_SCENE_FRAMES = 240    # 8 s minimum per scene
+
+
 def _validate_scenes(scenes: list[Any]) -> list[dict]:
-    """Validate and normalise scene objects."""
+    """Validate, normalise, and enforce 45-60 s total duration."""
     valid_types = {"title", "bullets", "diagram", "flow_chart", "comparison", "cta"}
     valid_colors = {"#3b82f6", "#10b981", "#f59e0b", "#ef4444"}
     result = []
@@ -226,14 +231,33 @@ def _validate_scenes(scenes: list[Any]) -> list[dict]:
         if not isinstance(scene, dict):
             continue
         result.append({
-            "heading":        str(scene.get("heading", f"Scene {i + 1}")),
-            "subheading":     scene.get("subheading") or None,
-            "bullets":        scene.get("bullets") or None,
-            "steps":          scene.get("steps") or None,
-            "accent_color":   scene.get("accent_color", "#3b82f6") if scene.get("accent_color") in valid_colors else "#3b82f6",
-            "duration_frames": max(60, int(scene.get("duration_frames", 90))),
-            "scene_type":     scene.get("scene_type", "bullets") if scene.get("scene_type") in valid_types else "bullets",
+            "heading":         str(scene.get("heading", f"Scene {i + 1}")),
+            "subheading":      scene.get("subheading") or None,
+            "bullets":         scene.get("bullets") or None,
+            "steps":           scene.get("steps") or None,
+            "accent_color":    scene.get("accent_color", "#3b82f6") if scene.get("accent_color") in valid_colors else "#3b82f6",
+            "duration_frames": max(_MIN_SCENE_FRAMES, int(scene.get("duration_frames", _MIN_SCENE_FRAMES))),
+            "scene_type":      scene.get("scene_type", "bullets") if scene.get("scene_type") in valid_types else "bullets",
         })
+
+    if not result:
+        return result
+
+    # Scale up proportionally if total is below 45 s
+    total = sum(s["duration_frames"] for s in result)
+    if total < _MIN_TOTAL_FRAMES:
+        scale = _MIN_TOTAL_FRAMES / total
+        for s in result:
+            s["duration_frames"] = int(s["duration_frames"] * scale)
+        logger.info("[RemotionAgent] Scaled frames %.0f→%d to meet 45 s minimum.", total, sum(s["duration_frames"] for s in result))
+
+    # Cap at 60 s
+    total = sum(s["duration_frames"] for s in result)
+    if total > _MAX_TOTAL_FRAMES:
+        scale = _MAX_TOTAL_FRAMES / total
+        for s in result:
+            s["duration_frames"] = int(s["duration_frames"] * scale)
+
     return result
 
 
