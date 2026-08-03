@@ -95,7 +95,7 @@ def facebook_node(state: PipelineState) -> dict:
 
     if not FACEBOOK_ACCESS_TOKEN:
         logger.info("[FacebookAgent] FACEBOOK_ACCESS_TOKEN not set — skipping upload.")
-        return {"facebook_post_id": "", "facebook_url": "", "error": None}
+        return {"facebook_post_id": "", "facebook_url": ""}
 
     if not mp4_path:
         err = "mp4_path is empty — cannot upload to Facebook."
@@ -180,5 +180,4 @@ def facebook_node(state: PipelineState) -> dict:
     return {
         "facebook_post_id": post_id,
         "facebook_url": facebook_url,
-        "error": None,
     }

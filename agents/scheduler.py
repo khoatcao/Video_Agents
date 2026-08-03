@@ -60,9 +60,24 @@ _FALLBACK_TOPICS = {
 }
 
 
+def _fetch_trending_headlines(max_headlines: int = 15) -> str:
+    """Fetch recent AI/tech headlines from RSS feeds to ground topic selection."""
+    try:
+        from tools.web_search import _fetch_all_feeds
+        articles = _fetch_all_feeds()
+        # Sort by recency, take top headlines
+        articles.sort(key=lambda a: a["published"], reverse=True)
+        top = articles[:max_headlines]
+        lines = [f"- {a['title']} ({a['source']})" for a in top]
+        return "\n".join(lines)
+    except Exception as exc:
+        logger.warning("[Scheduler] RSS fetch for topic planning failed: %s", exc)
+        return ""
+
+
 def _generate_daily_topics() -> dict[str, str]:
     """
-    Call a fast LLM to generate 3 different AI/tech topics for today.
+    Fetch trending RSS headlines then ask LLM to pick 3 topic ideas from real news.
 
     Returns a dict: {"morning": "…", "afternoon": "…", "evening": "…"}.
     Falls back to _FALLBACK_TOPICS on any error.
@@ -73,35 +88,45 @@ def _generate_daily_topics() -> dict[str, str]:
 
         from config.settings import MODEL_FAST, OLLAMA_BASE_URL
 
+        headlines = _fetch_trending_headlines()
+        today_str = date.today().strftime("%d/%m/%Y")
+
+        if headlines:
+            news_block = f"Tin tức AI/Tech mới nhất hôm nay ({today_str}):\n{headlines}\n\n"
+            instruction = (
+                "Dựa vào các tin tức trên, chọn 3 chủ đề video khác nhau phù hợp nhất "
+                "để giải thích cho lập trình viên Việt Nam. Ưu tiên chủ đề đang trending."
+            )
+        else:
+            news_block = ""
+            instruction = f"Hôm nay {today_str}. Đề xuất 3 chủ đề video AI/Tech đang trending."
+
         llm = ChatOllama(
             model=MODEL_FAST,
             base_url=OLLAMA_BASE_URL,
             temperature=0.9,
             format="json",
         )
-        today_str = date.today().strftime("%d/%m/%Y")
         messages = [
             SystemMessage(content=(
                 "Bạn là người lên kế hoạch nội dung cho kênh AI/Tech tại Việt Nam. "
                 "Trả về đúng một đối tượng JSON với ba key: "
                 "\"morning\", \"afternoon\", \"evening\". "
-                "Mỗi giá trị là một chủ đề video ngắn (tiếng Anh, 3–8 từ) phù hợp để "
-                "giải thích cho lập trình viên Việt Nam. Ba chủ đề phải khác nhau. "
-                "Chỉ trả về JSON."
+                "Mỗi giá trị là một chủ đề video ngắn (tiếng Anh, 3–8 từ). "
+                "Ba chủ đề phải hoàn toàn khác nhau. Chỉ trả về JSON."
             )),
-            HumanMessage(content=f"Hôm nay {today_str}. Đề xuất 3 chủ đề video AI/Tech."),
+            HumanMessage(content=news_block + instruction),
         ]
         response = llm.invoke(messages)
         raw: str = response.content if hasattr(response, "content") else str(response)
 
         import re
-        # Strip <think> tags
         raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
 
         import json as _json
         data = _json.loads(raw)
         if all(k in data and isinstance(data[k], str) for k in _SLOT_ORDER):
-            logger.info("[Scheduler] Generated daily topics: %s", data)
+            logger.info("[Scheduler] Generated daily topics from live news: %s", data)
             return {s: data[s] for s in _SLOT_ORDER}
     except Exception as exc:
         logger.warning("[Scheduler] Topic generation failed: %s — using fallbacks.", exc)

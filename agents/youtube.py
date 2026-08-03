@@ -75,7 +75,7 @@ def youtube_node(state: PipelineState) -> dict:
 
     if not YOUTUBE_CLIENT_ID:
         logger.info("[YouTubeAgent] YOUTUBE_CLIENT_ID not set — skipping upload.")
-        return {"youtube_url": "", "error": None}
+        return {"youtube_url": ""}
 
     if not mp4_path:
         err = "mp4_path is empty — cannot upload to YouTube."
@@ -140,4 +140,4 @@ def youtube_node(state: PipelineState) -> dict:
         return {"error": err, "status": "failed"}
 
     logger.info("[YouTubeAgent] Upload complete → %s", youtube_url)
-    return {"youtube_url": youtube_url, "error": None}
+    return {"youtube_url": youtube_url}
