@@ -78,11 +78,11 @@ def content_node(state: PipelineState) -> dict:
     slot: str = state["slot"]
 
     # ── 1. Web search for trending context ────────────────────────────────────
-    search_query = f"trending AI agents {topic} Vietnam"
+    search_query = f"{topic} AI technology latest 2025"
     logger.info("[ContentAgent] Fetching RSS feeds for: %r", search_query)
     try:
         search_results: str = search_trending_ai_topics.invoke(
-            {"query": search_query, "max_results": 5}
+            {"query": search_query, "max_results": 8}
         )
     except Exception as exc:
         logger.warning("[ContentAgent] RSS search failed: %s — continuing without results", exc)
@@ -95,14 +95,15 @@ def content_node(state: PipelineState) -> dict:
         temperature=0.7,
         format="json",
     )
-    llm_with_tools = llm.bind_tools([search_trending_ai_topics])
 
     human_message = (
         f"Chủ đề video: {topic}\n"
         f"Khung giờ đăng: {slot}\n\n"
-        f"--- Kết quả tìm kiếm xu hướng ---\n{search_results}\n"
-        f"---------------------------------\n\n"
-        "Hãy tạo kịch bản video theo schema JSON đã quy định."
+        f"--- Tin tức và thông tin trending mới nhất ---\n{search_results}\n"
+        f"----------------------------------------------\n\n"
+        "Dựa vào các tin tức trên, tạo kịch bản video hấp dẫn với nội dung CỤ THỂ, "
+        "trích dẫn số liệu/tên công ty/sự kiện thật từ tin tức nếu có. "
+        "Trả về JSON theo schema đã quy định."
     )
 
     messages = [
@@ -112,7 +113,7 @@ def content_node(state: PipelineState) -> dict:
 
     logger.info("[ContentAgent] Invoking %s …", MODEL_REASONING)
     try:
-        response = llm_with_tools.invoke(messages)
+        response = llm.invoke(messages)
         raw_content: str = response.content if hasattr(response, "content") else str(response)
     except Exception as exc:
         logger.error("[ContentAgent] LLM call failed: %s", exc)

@@ -355,49 +355,53 @@ def _build_tsx(scenes: list[dict]) -> str:
     return _TSX_TEMPLATE.replace("__SCENE_DATA__", scene_json)
 
 
+def _scene_plan_is_rich(scene_plan: list) -> bool:
+    """Return True if scene_plan already has heading/bullets/steps (new format)."""
+    return bool(scene_plan) and isinstance(scene_plan[0], dict) and "heading" in scene_plan[0]
+
+
 def remotion_node(state: PipelineState) -> dict:
     """
     LangGraph node: generate VideoComposition.tsx from scene_plan.
-    LLM generates JSON scene config → Python fills TSX template.
+
+    If content agent produced rich scenes (heading/bullets/steps), use them
+    directly — no second LLM call needed.  Falls back to LLM conversion for
+    legacy scene plans that only have text_overlay.
     """
     scene_plan = state.get("scene_plan", [])
 
     if not scene_plan:
         return {"error": "scene_plan is empty.", "status": "failed"}
 
-    llm = ChatOllama(
-        model=MODEL_CODE,
-        base_url=OLLAMA_BASE_URL,
-        temperature=0.4,
-    )
-
-    human_prompt = (
-        "Convert this scene plan into a JSON array of scene config objects.\n\n"
-        f"SCENE PLAN:\n{json.dumps(scene_plan, ensure_ascii=False, indent=2)}\n\n"
-        "Return ONLY a valid JSON array. No explanation, no markdown."
-    )
-
-    logger.info("[RemotionAgent] Invoking %s for %d scenes …", MODEL_CODE, len(scene_plan))
-    try:
-        response = llm.invoke([
-            SystemMessage(content=REMOTION_AGENT_SYSTEM_PROMPT),
-            HumanMessage(content=human_prompt),
-        ])
-        raw = response.content if hasattr(response, "content") else str(response)
-    except Exception as exc:
-        return {"error": f"LLM call failed: {exc}", "status": "failed"}
-
-    logger.info("[RemotionAgent] Raw response (%d chars): %s", len(raw), raw[:300])
-
-    try:
-        scenes_raw = _extract_json_array(raw)
-    except ValueError as exc:
-        logger.error("[RemotionAgent] JSON parse failed: %s", exc)
-        return {"error": str(exc), "status": "failed"}
+    if _scene_plan_is_rich(scene_plan):
+        logger.info("[RemotionAgent] Scene plan already has rich format — skipping LLM.")
+        scenes_raw = scene_plan
+    else:
+        logger.info("[RemotionAgent] Legacy scene plan — invoking %s to convert …", MODEL_CODE)
+        llm = ChatOllama(model=MODEL_CODE, base_url=OLLAMA_BASE_URL, temperature=0.4)
+        human_prompt = (
+            "Convert this scene plan into a JSON array of scene config objects.\n\n"
+            f"SCENE PLAN:\n{json.dumps(scene_plan, ensure_ascii=False, indent=2)}\n\n"
+            "Return ONLY a valid JSON array. No explanation, no markdown."
+        )
+        try:
+            response = llm.invoke([
+                SystemMessage(content=REMOTION_AGENT_SYSTEM_PROMPT),
+                HumanMessage(content=human_prompt),
+            ])
+            raw = response.content if hasattr(response, "content") else str(response)
+            logger.info("[RemotionAgent] Raw response (%d chars): %s", len(raw), raw[:300])
+        except Exception as exc:
+            return {"error": f"LLM call failed: {exc}", "status": "failed"}
+        try:
+            scenes_raw = _extract_json_array(raw)
+        except ValueError as exc:
+            logger.error("[RemotionAgent] JSON parse failed: %s", exc)
+            return {"error": str(exc), "status": "failed"}
 
     scenes = _validate_scenes(scenes_raw)
     if not scenes:
-        return {"error": "LLM returned no valid scenes.", "status": "failed"}
+        return {"error": "No valid scenes after validation.", "status": "failed"}
 
     scenes[0]["scene_type"] = "title"
     scenes[-1]["scene_type"] = "cta"
