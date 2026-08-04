@@ -52,7 +52,10 @@ def render_node(state: PipelineState) -> dict:
         logger.error("[RenderAgent] %s", err)
         return {"error": err, "status": "failed"}
 
-    # ── 1. Calculate total frames ──────────────────────────────────────────────
+    # ── 1. Calculate total frames from validated scene_plan ───────────────────
+    # Note: remotion_agent may have scaled duration_frames during validation.
+    # We use scene_plan here only for a basic sanity check; the actual render
+    # duration comes from TOTAL_FRAMES exported by VideoComposition.tsx.
     total_frames: int = sum(
         scene.get("duration_frames", 0) for scene in scene_plan
     )
@@ -60,6 +63,7 @@ def render_node(state: PipelineState) -> dict:
         err = f"total_frames={total_frames} is invalid."
         logger.error("[RenderAgent] %s", err)
         return {"error": err, "status": "failed"}
+    logger.info("[RenderAgent] scene_plan frames=%d (actual TSX duration may differ after validation)", total_frames)
 
     # ── 2. Build output path ───────────────────────────────────────────────────
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

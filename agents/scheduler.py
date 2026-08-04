@@ -223,22 +223,30 @@ def get_topic_for_slot(slot: str) -> str:
     return topics.get(slot, _FALLBACK_TOPICS[slot])
 
 
+# Source groups — each maps to a specific set of RSS feeds
+_SOURCE_GROUPS = ["infra", "startup", "community", "vietnam"]
+
+# group → slot name used internally (for file naming + state)
+_GROUP_TO_SLOT = {
+    "infra":     "morning",
+    "startup":   "afternoon",
+    "community": "evening",
+    "vietnam":   "night",
+}
+
+
 # ── Pipeline runner ────────────────────────────────────────────────────────────
 
-def run_pipeline(slot: str) -> None:
-    """
-    Fetch today's topic for *slot* and run the full LangGraph pipeline.
+def run_pipeline(group: str) -> None:
+    """Run the full pipeline for one source group, generating 1 video."""
+    from graph.pipeline import run_pipeline_graph
 
-    Logs success/failure to logs/pipeline.log.
-    """
-    from graph.pipeline import run_pipeline_graph  # lazy import to avoid circular deps
-
+    slot = _GROUP_TO_SLOT.get(group, group)
     topic = get_topic_for_slot(slot)
     start_ts = datetime.now(tz=pytz.timezone(TIMEZONE))
     logger.info(
-        "[Scheduler] *** Starting pipeline: slot=%s  topic=%r  time=%s ***",
-        slot,
-        topic,
+        "[Scheduler] *** Starting pipeline: group=%s  slot=%s  topic=%r  time=%s ***",
+        group, slot, topic,
         start_ts.strftime("%Y-%m-%d %H:%M:%S %Z"),
     )
 
@@ -251,95 +259,83 @@ def run_pipeline(slot: str) -> None:
 
         if status == "completed":
             logger.info(
-                "[Scheduler] Pipeline COMPLETED. YouTube=%s  Facebook=%s",
-                youtube_url or "(none)",
-                facebook_url or "(none)",
+                "[Scheduler] [%s] COMPLETED. YouTube=%s  Facebook=%s",
+                group, youtube_url or "(none)", facebook_url or "(none)",
             )
         else:
-            logger.error(
-                "[Scheduler] Pipeline ended with status=%r  error=%s",
-                status,
-                error,
-            )
+            logger.error("[Scheduler] [%s] ended with status=%r  error=%s", group, status, error)
     except Exception as exc:
-        logger.exception(
-            "[Scheduler] Unhandled exception running pipeline for slot=%s: %s",
-            slot,
-            exc,
-        )
+        logger.exception("[Scheduler] Unhandled exception for group=%s: %s", group, exc)
 
-    end_ts = datetime.now(tz=pytz.timezone(TIMEZONE))
-    duration = (end_ts - start_ts).total_seconds()
-    logger.info(
-        "[Scheduler] Pipeline for slot=%s finished in %.1fs.",
-        slot,
-        duration,
-    )
+    duration = (datetime.now(tz=pytz.timezone(TIMEZONE)) - start_ts).total_seconds()
+    logger.info("[Scheduler] [%s] finished in %.1fs.", group, duration)
+
+
+def run_all_groups() -> None:
+    """Run all 4 source groups sequentially → 4 videos per trigger."""
+    logger.info("[Scheduler] === Running all 4 source groups ===")
+    for group in _SOURCE_GROUPS:
+        run_pipeline(group)
+    logger.info("[Scheduler] === All 4 groups done ===")
 
 
 # ── Main entry point ───────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Video-Agent scheduler — run now or start cron jobs."
+        description="Video-Agent scheduler — generates 4 videos per run from 4 source groups."
     )
     parser.add_argument(
         "--run-now",
         action="store_true",
-        help="Run the pipeline immediately and exit (use with --slot).",
+        help="Run all 4 source groups immediately and exit.",
     )
     parser.add_argument(
-        "--slot",
-        choices=["morning", "afternoon", "evening", "night"],
-        default="morning",
-        help="Which slot to run (only used with --run-now).",
+        "--group",
+        choices=_SOURCE_GROUPS,
+        default=None,
+        help="Run only one specific source group (use with --run-now for testing).",
     )
     args = parser.parse_args()
 
     if args.run_now:
-        logger.info("[Scheduler] --run-now mode: slot=%s", args.slot)
-        run_pipeline(args.slot)
+        if args.group:
+            logger.info("[Scheduler] --run-now mode: single group=%s", args.group)
+            run_pipeline(args.group)
+        else:
+            logger.info("[Scheduler] --run-now mode: all 4 groups")
+            run_all_groups()
         return
 
-    # ── Start persistent APScheduler ──────────────────────────────────────────
+    # ── Start persistent APScheduler — 3x daily, each run = 4 videos ─────────
     tz = pytz.timezone(TIMEZONE)
     scheduler = BlockingScheduler(timezone=tz)
 
     scheduler.add_job(
-        func=run_pipeline,
+        func=run_all_groups,
         trigger=CronTrigger(hour=8, minute=0, timezone=tz),
-        args=["morning"],
-        id="morning_pipeline",
-        name="Morning AI video — infra (08:00 ICT)",
+        id="morning_batch",
+        name="Morning batch — 4 videos (08:00 ICT)",
         replace_existing=True,
     )
     scheduler.add_job(
-        func=run_pipeline,
-        trigger=CronTrigger(hour=12, minute=30, timezone=tz),
-        args=["afternoon"],
-        id="afternoon_pipeline",
-        name="Afternoon AI video — startup (12:30 ICT)",
+        func=run_all_groups,
+        trigger=CronTrigger(hour=14, minute=0, timezone=tz),
+        id="afternoon_batch",
+        name="Afternoon batch — 4 videos (14:00 ICT)",
         replace_existing=True,
     )
     scheduler.add_job(
-        func=run_pipeline,
-        trigger=CronTrigger(hour=17, minute=0, timezone=tz),
-        args=["evening"],
-        id="evening_pipeline",
-        name="Evening AI video — community (17:00 ICT)",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        func=run_pipeline,
+        func=run_all_groups,
         trigger=CronTrigger(hour=20, minute=0, timezone=tz),
-        args=["night"],
-        id="night_pipeline",
-        name="Night AI video — Vietnam (20:00 ICT)",
+        id="evening_batch",
+        name="Evening batch — 4 videos (20:00 ICT)",
         replace_existing=True,
     )
 
     logger.info(
-        "[Scheduler] Starting scheduler. Jobs: 08:00, 12:30, 17:00, 20:00 %s. Press Ctrl+C to stop.",
+        "[Scheduler] Starting scheduler. Batches: 08:00, 14:00, 20:00 %s "
+        "(4 videos per batch = 12 videos/day). Press Ctrl+C to stop.",
         TIMEZONE,
     )
     try:
