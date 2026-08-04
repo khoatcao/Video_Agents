@@ -52,6 +52,9 @@ YOUTUBE_CLIENT_SECRET: str = _optional("YOUTUBE_CLIENT_SECRET")
 YOUTUBE_REFRESH_TOKEN: str = _optional("YOUTUBE_REFRESH_TOKEN")
 
 # ── Facebook / Meta Graph API (optional — leave blank to skip upload) ─────────
+FACEBOOK_APP_ID: str = _optional("FACEBOOK_APP_ID")
+FACEBOOK_APP_SECRET: str = _optional("FACEBOOK_APP_SECRET")
+FACEBOOK_REDIRECT_URI: str = _optional("FACEBOOK_REDIRECT_URI", "http://localhost:8080/callback")
 FACEBOOK_ACCESS_TOKEN: str = _optional("FACEBOOK_ACCESS_TOKEN")
 FACEBOOK_PAGE_ID: str = _optional("FACEBOOK_PAGE_ID")
 
