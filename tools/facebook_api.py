@@ -43,7 +43,12 @@ _OAUTH_BASE = "https://www.facebook.com/dialog/oauth"
 _UPLOAD_TIMEOUT = 300
 _API_TIMEOUT = 30
 
-_REQUIRED_SCOPES = ["pages_show_list", "pages_read_management", "pages_manage_posts"]
+# Scopes needed to publish Reels on a Page
+_PUBLISH_SCOPES = ["pages_read_management", "pages_manage_posts"]
+
+# Extra scope required only during the OAuth token-exchange flow to list pages
+# via /me/accounts. Not needed once you already have the Page access token.
+_OAUTH_SCOPES = _PUBLISH_SCOPES + ["pages_show_list"]
 
 
 class FacebookAPIError(Exception):
@@ -86,7 +91,7 @@ def get_oauth_url(state: str = "") -> str:
     params = {
         "client_id": FACEBOOK_APP_ID,
         "redirect_uri": FACEBOOK_REDIRECT_URI,
-        "scope": ",".join(_REQUIRED_SCOPES),
+        "scope": ",".join(_OAUTH_SCOPES),
         "response_type": "code",
     }
     if state:
