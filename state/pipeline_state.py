@@ -84,8 +84,8 @@ def create_initial_state(topic: str, slot: str) -> PipelineState:
     Returns:
         A fully initialised PipelineState ready to hand to the LangGraph runner.
     """
-    if slot not in ("morning", "afternoon", "evening"):
-        raise ValueError(f"slot must be 'morning', 'afternoon', or 'evening'; got {slot!r}")
+    if slot not in ("morning", "afternoon", "evening", "night"):
+        raise ValueError(f"slot must be 'morning', 'afternoon', 'evening', or 'night'; got {slot!r}")
     if not topic.strip():
         raise ValueError("topic must be a non-empty string")
 

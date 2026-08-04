@@ -20,14 +20,22 @@ logger = logging.getLogger(__name__)
 
 # Curated RSS feeds — AI/tech news (English) + Vietnamese tech
 _RSS_FEEDS = [
-    # English AI/tech
-    ("Hacker News",         "https://hnrss.org/frontpage"),
+    # AI infra & research
+    ("NVIDIA Blog",         "https://blogs.nvidia.com/feed/"),
+    ("Google AI Blog",      "https://blog.google/technology/ai/rss/"),
+    ("AWS ML Blog",         "https://aws.amazon.com/blogs/machine-learning/feed/"),
+    ("Hugging Face Blog",   "https://huggingface.co/blog/feed.xml"),
+    ("OpenAI Blog",         "https://openai.com/blog/rss.xml"),
+    ("OpenAI News",         "https://news.google.com/rss/search?q=OpenAI&hl=en-US&gl=US&ceid=US:en"),
+    # Startup & business
     ("TechCrunch AI",       "https://techcrunch.com/category/artificial-intelligence/feed/"),
-    ("The Verge AI",        "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
-    ("MIT Tech Review",     "https://www.technologyreview.com/feed/"),
     ("VentureBeat AI",      "https://venturebeat.com/category/ai/feed/"),
-    ("ZDNet AI",            "https://www.zdnet.com/topic/artificial-intelligence/rss.xml"),
     ("Wired AI",            "https://www.wired.com/feed/tag/ai/latest/rss"),
+    ("The Verge AI",        "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
+    # Community & research
+    ("Hacker News",         "https://hnrss.org/frontpage"),
+    ("ZDNet AI",            "https://www.zdnet.com/topic/artificial-intelligence/rss.xml"),
+    ("MIT Tech Review",     "https://www.technologyreview.com/feed/"),
     ("Google News AI",      "https://news.google.com/rss/search?q=artificial+intelligence&hl=en-US&gl=US&ceid=US:en"),
     # Vietnamese tech
     ("VnExpress Công nghệ", "https://vnexpress.net/rss/so-hoa.rss"),
@@ -35,6 +43,14 @@ _RSS_FEEDS = [
     ("Tuoi Tre Công nghệ",  "https://tuoitre.vn/rss/nhip-song-so.rss"),
     ("Thanh Niên Công nghệ","https://thanhnien.vn/rss/cong-nghe.rss"),
 ]
+
+# Slot → which sources to pull from
+_SLOT_SOURCES: dict[str, list[str]] = {
+    "morning":   ["NVIDIA Blog", "Google AI Blog", "AWS ML Blog", "Hugging Face Blog", "OpenAI Blog", "OpenAI News"],
+    "afternoon": ["TechCrunch AI", "VentureBeat AI", "Wired AI", "The Verge AI"],
+    "evening":   ["Hacker News", "ZDNet AI", "MIT Tech Review", "Google News AI"],
+    "night":     ["VnExpress Công nghệ", "VnExpress Khoa học", "Tuoi Tre Công nghệ", "Thanh Niên Công nghệ"],
+}
 
 _FETCH_TIMEOUT = 10   # seconds per feed
 _MAX_AGE_DAYS  = 7    # ignore articles older than this
@@ -93,28 +109,30 @@ def _score_article(article: dict, keywords: list[str]) -> int:
     return sum(1 for kw in keywords if kw.lower() in text)
 
 
-def _fetch_all_feeds(max_workers: int = 6) -> list[dict]:
-    """Fetch all feeds in parallel and return combined article list."""
+def _fetch_all_feeds(max_workers: int = 6, slot: str | None = None) -> list[dict]:
+    """Fetch feeds in parallel. If slot given, only fetch that slot's sources."""
+    allowed = _SLOT_SOURCES.get(slot) if slot else None
+    feeds = [(name, url) for name, url in _RSS_FEEDS if allowed is None or name in allowed]
     all_articles: list[dict] = []
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(_fetch_feed, name, url): name for name, url in _RSS_FEEDS}
+        futures = {pool.submit(_fetch_feed, name, url): name for name, url in feeds}
         for future in as_completed(futures):
             all_articles.extend(future.result())
     return all_articles
 
 
 @tool
-def search_trending_ai_topics(query: str, max_results: int = 5) -> str:
+def search_trending_ai_topics(query: str, max_results: int = 5, slot: str = "") -> str:
     """
     Search trending AI and tech news from RSS feeds — no API key required.
 
-    Fetches from Hacker News, TechCrunch, The Verge, MIT Tech Review,
-    VentureBeat, VnExpress, and Tuoi Tre in parallel. Filters and ranks
-    articles by keyword relevance and recency.
+    Fetches from curated sources grouped by slot (morning=infra, afternoon=startup,
+    evening=community, night=vietnam). Falls back to all sources if slot not given.
 
     Args:
         query:       Keywords to filter articles (English or Vietnamese).
         max_results: Number of articles to return (default 5).
+        slot:        Optional slot name to filter sources (morning/afternoon/evening/night).
 
     Returns:
         Formatted string with title, source, URL, and summary per article.
@@ -122,8 +140,8 @@ def search_trending_ai_topics(query: str, max_results: int = 5) -> str:
     max_results = max(1, min(max_results, 10))
     keywords = query.lower().split()
 
-    logger.info("Fetching RSS feeds for query: %r", query)
-    articles = _fetch_all_feeds()
+    logger.info("Fetching RSS feeds for query: %r  slot: %r", query, slot or "all")
+    articles = _fetch_all_feeds(slot=slot or None)
 
     if not articles:
         logger.warning("All RSS feeds returned no articles.")

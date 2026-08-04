@@ -51,12 +51,13 @@ logger = logging.getLogger("scheduler")
 
 # ── Slot → topic mapping helpers ──────────────────────────────────────────────
 
-_SLOT_ORDER = ["morning", "afternoon", "evening"]
+_SLOT_ORDER = ["morning", "afternoon", "evening", "night"]
 
 _FALLBACK_TOPICS = {
-    "morning": "LangGraph multi-agent workflow",
-    "afternoon": "RAG pipeline với Vietnamese corpus",
-    "evening": "Local LLM với Ollama và deepseek-r1",
+    "morning":   "NVIDIA Blackwell GPU AI training",
+    "afternoon": "AI startup funding trends 2025",
+    "evening":   "Open source LLM tools for developers",
+    "night":     "Trí tuệ nhân tạo tại Việt Nam 2025",
 }
 
 
@@ -152,10 +153,14 @@ def _generate_daily_topics() -> dict[str, str]:
         messages = [
             SystemMessage(content=(
                 "Bạn là người lên kế hoạch nội dung cho kênh AI/Tech tại Việt Nam. "
-                "Trả về đúng một đối tượng JSON với ba key: "
-                "\"morning\", \"afternoon\", \"evening\". "
-                "Mỗi giá trị là một chủ đề video ngắn (tiếng Anh, 3–8 từ). "
-                "Ba chủ đề phải hoàn toàn khác nhau. Chỉ trả về JSON."
+                "Trả về đúng một đối tượng JSON với bốn key: "
+                "\"morning\", \"afternoon\", \"evening\", \"night\". "
+                "Quy tắc chọn topic theo slot:\n"
+                "- morning: AI infra, GPU, model mới từ NVIDIA/Google/AWS/HuggingFace\n"
+                "- afternoon: AI startup, product launch, business news\n"
+                "- evening: open source tools, developer community, research\n"
+                "- night: AI news liên quan đến Việt Nam, tiếng Việt\n"
+                "Bốn chủ đề phải hoàn toàn khác nhau. Mỗi chủ đề 3–8 từ tiếng Anh. Chỉ trả về JSON."
             )),
             HumanMessage(content=news_block + instruction),
         ]
@@ -285,7 +290,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--slot",
-        choices=["morning", "afternoon", "evening"],
+        choices=["morning", "afternoon", "evening", "night"],
         default="morning",
         help="Which slot to run (only used with --run-now).",
     )
@@ -305,7 +310,7 @@ def main() -> None:
         trigger=CronTrigger(hour=8, minute=0, timezone=tz),
         args=["morning"],
         id="morning_pipeline",
-        name="Morning AI video (08:00 ICT)",
+        name="Morning AI video — infra (08:00 ICT)",
         replace_existing=True,
     )
     scheduler.add_job(
@@ -313,20 +318,28 @@ def main() -> None:
         trigger=CronTrigger(hour=12, minute=30, timezone=tz),
         args=["afternoon"],
         id="afternoon_pipeline",
-        name="Afternoon AI video (12:30 ICT)",
+        name="Afternoon AI video — startup (12:30 ICT)",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        func=run_pipeline,
+        trigger=CronTrigger(hour=17, minute=0, timezone=tz),
+        args=["evening"],
+        id="evening_pipeline",
+        name="Evening AI video — community (17:00 ICT)",
         replace_existing=True,
     )
     scheduler.add_job(
         func=run_pipeline,
         trigger=CronTrigger(hour=20, minute=0, timezone=tz),
-        args=["evening"],
-        id="evening_pipeline",
-        name="Evening AI video (20:00 ICT)",
+        args=["night"],
+        id="night_pipeline",
+        name="Night AI video — Vietnam (20:00 ICT)",
         replace_existing=True,
     )
 
     logger.info(
-        "[Scheduler] Starting scheduler. Jobs: 08:00, 12:30, 20:00 %s. Press Ctrl+C to stop.",
+        "[Scheduler] Starting scheduler. Jobs: 08:00, 12:30, 17:00, 20:00 %s. Press Ctrl+C to stop.",
         TIMEZONE,
     )
     try:

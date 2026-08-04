@@ -79,10 +79,10 @@ def content_node(state: PipelineState) -> dict:
 
     # ── 1. Web search for trending context ────────────────────────────────────
     search_query = f"{topic} AI technology latest 2025"
-    logger.info("[ContentAgent] Fetching RSS feeds for: %r", search_query)
+    logger.info("[ContentAgent] Fetching RSS feeds for: %r  slot=%r", search_query, slot)
     try:
         search_results: str = search_trending_ai_topics.invoke(
-            {"query": search_query, "max_results": 8}
+            {"query": search_query, "max_results": 8, "slot": slot}
         )
     except Exception as exc:
         logger.warning("[ContentAgent] RSS search failed: %s — continuing without results", exc)
