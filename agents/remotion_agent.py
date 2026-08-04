@@ -310,6 +310,28 @@ _MAX_TOTAL_FRAMES = 1800   # 60 s at 30 fps
 _MIN_SCENE_FRAMES = 240    # 8 s minimum per scene
 
 
+def _to_string_list(val: Any) -> list[str] | None:
+    """Coerce bullets/steps to a flat list of strings — handles objects from over-eager LLMs."""
+    if not val or not isinstance(val, list):
+        return None
+    result = []
+    for item in val:
+        if isinstance(item, str):
+            result.append(item)
+        elif isinstance(item, dict):
+            # Extract the most text-like field from the object
+            text = (
+                item.get("text") or item.get("step") or item.get("content")
+                or item.get("title") or item.get("label") or item.get("description")
+                or next((v for v in item.values() if isinstance(v, str)), None)
+                or str(item)
+            )
+            result.append(str(text)[:80])
+        else:
+            result.append(str(item))
+    return result or None
+
+
 def _validate_scenes(scenes: list[Any]) -> list[dict]:
     """Validate, normalise, and enforce 45-60 s total duration."""
     valid_types = {"title", "bullets", "diagram", "flow_chart", "comparison", "cta"}
@@ -321,8 +343,8 @@ def _validate_scenes(scenes: list[Any]) -> list[dict]:
         result.append({
             "heading":         str(scene.get("heading", f"Scene {i + 1}")),
             "subheading":      scene.get("subheading") or None,
-            "bullets":         scene.get("bullets") or None,
-            "steps":           scene.get("steps") or None,
+            "bullets":         _to_string_list(scene.get("bullets")),
+            "steps":           _to_string_list(scene.get("steps")),
             "accent_color":    scene.get("accent_color", "#3b82f6") if scene.get("accent_color") in valid_colors else "#3b82f6",
             "duration_frames": max(_MIN_SCENE_FRAMES, int(scene.get("duration_frames", _MIN_SCENE_FRAMES))),
             "scene_type":      scene.get("scene_type", "bullets") if scene.get("scene_type") in valid_types else "bullets",

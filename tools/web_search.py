@@ -66,9 +66,12 @@ def _fetch_feed(name: str, url: str) -> list[dict]:
             if not title:
                 continue
 
-            # Strip HTML tags from summary
+            # Prefer full content over summary if available
             import re
-            summary = re.sub(r"<[^>]+>", "", summary)[:300]
+            content = getattr(entry, "content", None)
+            if content and isinstance(content, list) and content[0].get("value"):
+                summary = content[0]["value"]
+            summary = re.sub(r"<[^>]+>", "", summary)[:800]
 
             articles.append({
                 "source":    name,
