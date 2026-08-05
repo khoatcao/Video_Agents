@@ -81,14 +81,17 @@ def content_node(state: PipelineState) -> dict:
     search_query = f"{topic} AI technology latest 2025"
     logger.info("[ContentAgent] Fetching RSS feeds for: %r  slot=%r", search_query, slot)
     primary_source = ""
+    primary_source_url = ""
     try:
         search_results: str = search_trending_ai_topics.invoke(
             {"query": search_query, "max_results": 8, "slot": slot}
         )
-        # Extract the first source name from the formatted results
         for line in search_results.splitlines():
-            if "Source:" in line:
+            if "Source:" in line and not primary_source:
                 primary_source = line.split("Source:")[-1].split("—")[0].strip()
+            if "URL:" in line and not primary_source_url:
+                primary_source_url = line.split("URL:")[-1].strip()
+            if primary_source and primary_source_url:
                 break
     except Exception as exc:
         logger.warning("[ContentAgent] RSS search failed: %s — continuing without results", exc)
@@ -155,6 +158,7 @@ def content_node(state: PipelineState) -> dict:
 
     return {
         "source": primary_source,
+        "source_url": primary_source_url,
         "scene_plan": scene_plan,
         "youtube_metadata": youtube_metadata,
         "facebook_metadata": facebook_metadata,

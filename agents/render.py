@@ -49,6 +49,7 @@ def render_node(state: PipelineState) -> dict:
     slot: str = state.get("slot", "morning")
     topic: str = state.get("topic", "")
     source: str = state.get("source", "")
+    source_url: str = state.get("source_url", "")
     youtube_metadata: dict = state.get("youtube_metadata", {})
 
     if not scene_plan:
@@ -145,7 +146,8 @@ def render_node(state: PipelineState) -> dict:
     vi_description = youtube_metadata.get("vi_description", "")
     tags: list = youtube_metadata.get("tags", [])
     hashtags = " ".join(f"#{t.lstrip('#')}" for t in tags)
-    metadata = "\n".join(filter(None, [
+
+    lines = [
         "=" * 50,
         "ENGLISH",
         "=" * 50,
@@ -160,13 +162,18 @@ def render_node(state: PipelineState) -> dict:
         "=" * 50,
         "VIETNAMESE",
         "=" * 50,
-        f"Tiêu đề: {vi_title} #Shorts" if vi_title else "",
+        f"Tiêu đề: {vi_title} #Shorts",
         "",
-        "Mô tả:" if vi_description else "",
+        "Mô tả:",
         vi_description,
         "",
-        f"Source: {source}" if source else "",
-    ]))
+    ]
+    if source:
+        lines.append(f"Source: {source}")
+    if source_url:
+        lines.append(f"URL: {source_url}")
+
+    metadata = "\n".join(lines)
     try:
         (Path(resolved_path).parent / "metadata.txt").write_text(metadata, encoding="utf-8")
         logger.info("[RenderAgent] metadata.txt written → %s", Path(resolved_path).parent)

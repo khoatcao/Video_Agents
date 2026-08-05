@@ -48,6 +48,7 @@ class PipelineState(TypedDict):
 
     # ── Content planning ─────────────────────────────────────────────────────
     source: str                      # primary news source (e.g. "TechCrunch AI")
+    source_url: str                  # URL of the primary article
     scene_plan: List[ScenePlan]
     youtube_metadata: YouTubeMetadata
     facebook_metadata: FacebookMetadata
@@ -94,6 +95,7 @@ def create_initial_state(topic: str, slot: str) -> PipelineState:
         topic=topic.strip(),
         slot=slot,
         source="",
+        source_url="",
         scene_plan=[],
         youtube_metadata=YouTubeMetadata(
             title="",
