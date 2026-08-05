@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -120,7 +121,23 @@ def youtube_node(state: PipelineState) -> dict:
     tags: list[str] = optimised.get("tags", [])
     category_id: str = str(optimised.get("category_id", "28"))
 
-    # ── 2. Upload to YouTube ───────────────────────────────────────────────────
+    # ── 2. Write metadata.txt into the video's subfolder ──────────────────────
+    video_dir = Path(mp4_path).parent
+    hashtags = " ".join(f"#{t.lstrip('#')}" for t in tags)
+    metadata_lines = [
+        f"Title: {title} #Shorts",
+        "",
+        f"Description:\n{description}",
+        "",
+        f"Hashtags:\n{hashtags}",
+    ]
+    try:
+        (video_dir / "metadata.txt").write_text("\n".join(metadata_lines), encoding="utf-8")
+        logger.info("[YouTubeAgent] metadata.txt written → %s", video_dir / "metadata.txt")
+    except Exception as exc:
+        logger.warning("[YouTubeAgent] Could not write metadata.txt: %s", exc)
+
+    # ── 3. Upload to YouTube ───────────────────────────────────────────────────
     logger.info("[YouTubeAgent] Uploading %s to YouTube …", mp4_path)
     try:
         youtube_url = upload_youtube_short(

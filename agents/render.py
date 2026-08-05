@@ -73,7 +73,9 @@ def render_node(state: PipelineState) -> dict:
     topic_slug = re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")[:50]
     source_slug = re.sub(r"[^a-z0-9]+", "-", source.lower()).strip("-")[:20] if source else ""
     name = f"{date_str}_{source_slug}_{topic_slug}" if source_slug else f"{date_str}_{topic_slug}"
-    mp4_path = str(OUTPUT_DIR / f"{name}.mp4")
+    video_dir = OUTPUT_DIR / name
+    video_dir.mkdir(parents=True, exist_ok=True)
+    mp4_path = str(video_dir / f"{name}.mp4")
 
     # ── 3. Build scene_data payload ────────────────────────────────────────────
     scene_data = {
