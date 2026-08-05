@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -104,27 +103,5 @@ def youtube_node(state: PipelineState) -> dict:
             logger.warning("[YouTubeAgent] LLM returned incomplete metadata — using original.")
     except Exception as exc:
         logger.warning("[YouTubeAgent] Metadata optimisation failed: %s — using original.", exc)
-
-    title: str = optimised.get("title", "AI Video")
-    description: str = optimised.get("description", "")
-    tags: list[str] = optimised.get("tags", [])
-
-    # ── 2. Write metadata.txt ──────────────────────────────────────────────────
-    video_dir = Path(mp4_path).parent
-    hashtags = " ".join(f"#{t.lstrip('#')}" for t in tags)
-    metadata = "\n".join([
-        f"Title: {title} #Shorts",
-        "",
-        "Description:",
-        description,
-        "",
-        "Hashtags:",
-        hashtags,
-    ])
-    try:
-        (video_dir / "metadata.txt").write_text(metadata, encoding="utf-8")
-        logger.info("[YouTubeAgent] Ready for manual upload → %s", video_dir)
-    except Exception as exc:
-        logger.warning("[YouTubeAgent] Could not write metadata.txt: %s", exc)
 
     return {"youtube_url": ""}

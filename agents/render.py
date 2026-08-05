@@ -49,6 +49,7 @@ def render_node(state: PipelineState) -> dict:
     slot: str = state.get("slot", "morning")
     topic: str = state.get("topic", "")
     source: str = state.get("source", "")
+    youtube_metadata: dict = state.get("youtube_metadata", {})
 
     if not scene_plan:
         err = "scene_plan is empty — cannot determine total_frames for render."
@@ -136,6 +137,27 @@ def render_node(state: PipelineState) -> dict:
         return {"error": err, "status": "failed"}
 
     logger.info("[RenderAgent] Render complete → %s", resolved_path)
+
+    # ── 5. Write metadata.txt alongside the video ─────────────────────────────
+    title = youtube_metadata.get("title", topic)
+    description = youtube_metadata.get("description", "")
+    tags: list = youtube_metadata.get("tags", [])
+    hashtags = " ".join(f"#{t.lstrip('#')}" for t in tags)
+    metadata = "\n".join([
+        f"Title: {title} #Shorts",
+        "",
+        "Description:",
+        description,
+        "",
+        "Hashtags:",
+        hashtags,
+    ])
+    try:
+        (Path(resolved_path).parent / "metadata.txt").write_text(metadata, encoding="utf-8")
+        logger.info("[RenderAgent] metadata.txt written → %s", Path(resolved_path).parent)
+    except Exception as exc:
+        logger.warning("[RenderAgent] Could not write metadata.txt: %s", exc)
+
     return {
         "mp4_path": resolved_path,
         "error": None,
