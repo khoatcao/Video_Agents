@@ -141,9 +141,14 @@ def render_node(state: PipelineState) -> dict:
     # ── 5. Write metadata.txt alongside the video ─────────────────────────────
     title = youtube_metadata.get("title", topic)
     description = youtube_metadata.get("description", "")
+    vi_title = youtube_metadata.get("vi_title", "")
+    vi_description = youtube_metadata.get("vi_description", "")
     tags: list = youtube_metadata.get("tags", [])
     hashtags = " ".join(f"#{t.lstrip('#')}" for t in tags)
-    metadata = "\n".join([
+    metadata = "\n".join(filter(None, [
+        "=" * 50,
+        "ENGLISH",
+        "=" * 50,
         f"Title: {title} #Shorts",
         "",
         "Description:",
@@ -151,7 +156,17 @@ def render_node(state: PipelineState) -> dict:
         "",
         "Hashtags:",
         hashtags,
-    ])
+        "",
+        "=" * 50,
+        "VIETNAMESE",
+        "=" * 50,
+        f"Tiêu đề: {vi_title} #Shorts" if vi_title else "",
+        "",
+        "Mô tả:" if vi_description else "",
+        vi_description,
+        "",
+        f"Source: {source}" if source else "",
+    ]))
     try:
         (Path(resolved_path).parent / "metadata.txt").write_text(metadata, encoding="utf-8")
         logger.info("[RenderAgent] metadata.txt written → %s", Path(resolved_path).parent)
