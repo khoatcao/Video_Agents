@@ -3,7 +3,7 @@ Main LangGraph pipeline for the video-generation system.
 
 Graph topology:
 
-  START → content ──(retry loop)──► remotion ──(retry loop)──► render ──(retry loop)──► facebook → END
+  START → content ──(retry loop)──► remotion ──(retry loop)──► render ──(retry loop)──► youtube → END
 
 Retry loops: content_retry → content, remotion_retry → remotion, render_retry → render.
 On exhausted retries, each node routes to fail_node → END.
@@ -16,10 +16,10 @@ import logging
 from langgraph.graph import END, START, StateGraph
 
 from agents.content import content_node
-from agents.facebook import facebook_node
 from agents.orchestrator import fail_node, handle_error, should_retry
 from agents.remotion_agent import remotion_node
 from agents.render import render_node
+from agents.youtube import youtube_node
 from state.pipeline_state import PipelineState, create_initial_state
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def build_graph() -> StateGraph:
     graph.add_node("render", render_node)
     graph.add_node("render_retry", handle_error)
 
-    graph.add_node("facebook", facebook_node)
+    graph.add_node("youtube", youtube_node)
     graph.add_node("fail", fail_node)
 
     # ── Entry point ────────────────────────────────────────────────────────────
@@ -81,13 +81,13 @@ def build_graph() -> StateGraph:
         {
             "retry": "render_retry",
             "fail": "fail",
-            "continue": "facebook",
+            "continue": "youtube",
         },
     )
     graph.add_edge("render_retry", "render")
 
-    # ── Facebook → END ────────────────────────────────────────────────────────
-    graph.add_edge("facebook", END)
+    # ── YouTube → END ─────────────────────────────────────────────────────────
+    graph.add_edge("youtube", END)
 
     # ── Failure terminal ──────────────────────────────────────────────────────
     graph.add_edge("fail", END)
@@ -119,8 +119,8 @@ def run_pipeline_graph(topic: str, slot: str) -> PipelineState:
         final_state["status"] = "completed"
 
     logger.info(
-        "[Pipeline] Finished. status=%r  facebook_url=%r",
+        "[Pipeline] Finished. status=%r  youtube_url=%r",
         final_state.get("status"),
-        final_state.get("facebook_url"),
+        final_state.get("youtube_url"),
     )
     return final_state  # type: ignore[return-value]

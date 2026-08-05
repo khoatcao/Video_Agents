@@ -25,15 +25,15 @@ from tools.youtube_api import upload_youtube_short
 logger = logging.getLogger(__name__)
 
 _YOUTUBE_OPTIMISER_PROMPT = """\
-Bạn là chuyên gia SEO YouTube cho kênh công nghệ/AI tại Việt Nam.
-Nhận vào JSON chứa title, description và tags của một video Shorts.
-Trả về **đúng một đối tượng JSON** với cùng cấu trúc nhưng đã được tối ưu:
-  - title: tối đa 97 ký tự (để chừa chỗ cho " #Shorts"), chứa từ khoá chính, hấp dẫn.
-  - description: 150–300 từ, có từ khoá SEO, dòng đầu tiên là câu hook, \
-kết thúc bằng CTA và các hashtag chính.
-  - tags: danh sách 10–15 tag, gồm cả tiếng Việt và tiếng Anh.
-  - category_id: giữ nguyên giá trị đầu vào.
-Chỉ trả về JSON. Không giải thích.
+You are a YouTube SEO expert for an AI/tech Shorts channel.
+Given a JSON object with title, description, and tags for a YouTube Short, \
+return exactly one optimised JSON object with the same structure:
+  - title: max 97 characters (leave room for " #Shorts"), include the main keyword, make it punchy.
+  - description: 150–300 words, SEO keywords throughout, first line is a hook, \
+ends with a CTA and key hashtags. All in English.
+  - tags: 10–15 tags in English covering the topic, tools, and technologies mentioned.
+  - category_id: keep the input value unchanged.
+Return JSON only. No explanation.
 """
 
 
@@ -91,9 +91,9 @@ def youtube_node(state: PipelineState) -> dict:
     )
 
     human_message = (
-        "Tối ưu hoá metadata YouTube sau đây cho khán giả kỹ thuật Việt Nam:\n\n"
+        "Optimise the following YouTube metadata for an English-speaking technical audience:\n\n"
         f"```json\n{json.dumps(youtube_metadata, ensure_ascii=False, indent=2)}\n```\n\n"
-        "Trả về JSON đã được tối ưu theo schema quy định."
+        "Return the optimised JSON matching the required schema."
     )
 
     messages = [
