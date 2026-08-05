@@ -28,6 +28,13 @@ from state.pipeline_state import PipelineState, create_initial_state
 
 logger = logging.getLogger(__name__)
 
+# LangSmith tracing — enabled automatically when LANGCHAIN_TRACING_V2=true
+from config.settings import LANGCHAIN_API_KEY, LANGCHAIN_PROJECT, LANGCHAIN_TRACING_V2
+if LANGCHAIN_TRACING_V2 == "true" and LANGCHAIN_API_KEY:
+    logger.info("[Pipeline] LangSmith tracing enabled — project=%r", LANGCHAIN_PROJECT)
+else:
+    logger.info("[Pipeline] LangSmith tracing disabled — set LANGCHAIN_TRACING_V2=true and LANGCHAIN_API_KEY to enable")
+
 
 def build_graph() -> StateGraph:
     graph = StateGraph(PipelineState)

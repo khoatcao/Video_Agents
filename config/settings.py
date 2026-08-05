@@ -34,6 +34,14 @@ def _optional(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
+# ── LangSmith observability ───────────────────────────────────────────────────
+# These are read directly by LangChain — no extra code needed.
+# Set LANGCHAIN_TRACING_V2=true and LANGCHAIN_API_KEY in .env to enable.
+LANGCHAIN_TRACING_V2: str = _optional("LANGCHAIN_TRACING_V2", "false")
+LANGCHAIN_API_KEY: str = _optional("LANGCHAIN_API_KEY")
+LANGCHAIN_PROJECT: str = _optional("LANGCHAIN_PROJECT", "video-agent")
+LANGCHAIN_ENDPOINT: str = _optional("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
+
 # ── Ollama ────────────────────────────────────────────────────────────────────
 OLLAMA_BASE_URL: str = _optional("OLLAMA_BASE_URL", "http://localhost:11434")
 
