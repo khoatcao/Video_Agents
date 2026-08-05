@@ -80,10 +80,16 @@ def content_node(state: PipelineState) -> dict:
     # ── 1. Web search for trending context ────────────────────────────────────
     search_query = f"{topic} AI technology latest 2025"
     logger.info("[ContentAgent] Fetching RSS feeds for: %r  slot=%r", search_query, slot)
+    primary_source = ""
     try:
         search_results: str = search_trending_ai_topics.invoke(
             {"query": search_query, "max_results": 8, "slot": slot}
         )
+        # Extract the first source name from the formatted results
+        for line in search_results.splitlines():
+            if "Source:" in line:
+                primary_source = line.split("Source:")[-1].split("—")[0].strip()
+                break
     except Exception as exc:
         logger.warning("[ContentAgent] RSS search failed: %s — continuing without results", exc)
         search_results = "Search unavailable."
@@ -97,13 +103,13 @@ def content_node(state: PipelineState) -> dict:
     )
 
     human_message = (
-        f"Chủ đề video: {topic}\n"
-        f"Khung giờ đăng: {slot}\n\n"
-        f"--- Tin tức và thông tin trending mới nhất ---\n{search_results}\n"
-        f"----------------------------------------------\n\n"
-        "Dựa vào các tin tức trên, tạo kịch bản video hấp dẫn với nội dung CỤ THỂ, "
-        "trích dẫn số liệu/tên công ty/sự kiện thật từ tin tức nếu có. "
-        "Trả về JSON theo schema đã quy định."
+        f"Video topic: {topic}\n"
+        f"Scheduling slot: {slot}\n\n"
+        f"--- Latest trending news ---\n{search_results}\n"
+        f"----------------------------\n\n"
+        "Using the news articles above, create an engaging video script with SPECIFIC content — "
+        "cite real numbers, company names, and events from the articles where available. "
+        "Return JSON matching the required schema. All text must be in English."
     )
 
     messages = [
@@ -148,6 +154,7 @@ def content_node(state: PipelineState) -> dict:
     )
 
     return {
+        "source": primary_source,
         "scene_plan": scene_plan,
         "youtube_metadata": youtube_metadata,
         "facebook_metadata": facebook_metadata,

@@ -48,6 +48,7 @@ def render_node(state: PipelineState) -> dict:
     scene_plan = state.get("scene_plan", [])
     slot: str = state.get("slot", "morning")
     topic: str = state.get("topic", "")
+    source: str = state.get("source", "")
 
     if not scene_plan:
         err = "scene_plan is empty — cannot determine total_frames for render."
@@ -69,8 +70,10 @@ def render_node(state: PipelineState) -> dict:
 
     # ── 2. Build output path ───────────────────────────────────────────────────
     date_str = datetime.now().strftime("%Y-%m-%d")
-    topic_slug = re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")[:60]
-    mp4_path = str(OUTPUT_DIR / f"{date_str}_{topic_slug}.mp4")
+    topic_slug = re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")[:50]
+    source_slug = re.sub(r"[^a-z0-9]+", "-", source.lower()).strip("-")[:20] if source else ""
+    name = f"{date_str}_{source_slug}_{topic_slug}" if source_slug else f"{date_str}_{topic_slug}"
+    mp4_path = str(OUTPUT_DIR / f"{name}.mp4")
 
     # ── 3. Build scene_data payload ────────────────────────────────────────────
     scene_data = {
