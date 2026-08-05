@@ -17,7 +17,7 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
-from config.settings import MODEL_FAST, OLLAMA_BASE_URL
+from config.settings import MODEL_FAST, OLLAMA_BASE_URL, TEMPERATURE_METADATA
 from state.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ def youtube_node(state: PipelineState) -> dict:
     llm = ChatOllama(
         model=MODEL_FAST,
         base_url=OLLAMA_BASE_URL,
-        temperature=0.5,
+        temperature=TEMPERATURE_METADATA,
         format="json",
     )
     human_message = (

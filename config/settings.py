@@ -45,6 +45,10 @@ LANGCHAIN_ENDPOINT: str = _optional("LANGCHAIN_ENDPOINT", "https://api.smith.lan
 # ── Ollama ────────────────────────────────────────────────────────────────────
 OLLAMA_BASE_URL: str = _optional("OLLAMA_BASE_URL", "http://localhost:11434")
 
+# ── LLM temperature ───────────────────────────────────────────────────────────
+TEMPERATURE_CONTENT: float = float(_optional("TEMPERATURE_CONTENT", "0.0"))
+TEMPERATURE_METADATA: float = float(_optional("TEMPERATURE_METADATA", "0.0"))
+
 # ── Model aliases ─────────────────────────────────────────────────────────────
 # All agents use qwen2.5:7b — single lightweight model, low VRAM (~5 GB),
 # sufficient for Vietnamese content, code generation, and product matching

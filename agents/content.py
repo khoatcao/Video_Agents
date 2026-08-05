@@ -19,7 +19,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
 from config.prompts.content_agent import CONTENT_AGENT_SYSTEM_PROMPT
-from config.settings import MODEL_REASONING, OLLAMA_BASE_URL
+from config.settings import MODEL_REASONING, OLLAMA_BASE_URL, TEMPERATURE_CONTENT
 from state.pipeline_state import PipelineState
 from tools.web_search import search_trending_ai_topics
 
@@ -101,7 +101,7 @@ def content_node(state: PipelineState) -> dict:
     llm = ChatOllama(
         model=MODEL_REASONING,
         base_url=OLLAMA_BASE_URL,
-        temperature=0.7,
+        temperature=TEMPERATURE_CONTENT,
         format="json",
     )
 
