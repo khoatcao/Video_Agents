@@ -294,7 +294,13 @@ def main() -> None:
         "--group",
         choices=_SOURCE_GROUPS,
         default=None,
-        help="Run only one specific source group (use with --run-now for testing).",
+        help="Run one source group: infra | startup | community | vietnam",
+    )
+    parser.add_argument(
+        "--slot",
+        choices=list(_GROUP_TO_SLOT.values()),
+        default=None,
+        help="Run by slot name: morning | afternoon | evening | night (alternative to --group)",
     )
     args = parser.parse_args()
 
@@ -303,7 +309,7 @@ def main() -> None:
             logger.info("[Scheduler] --run-now mode: single group=%s", args.group)
             run_pipeline(args.group)
         else:
-            logger.info("[Scheduler] --run-now mode: all 4 groups")
+            logger.info("[Scheduler] --run-now mode: all 4 groups (slot=%s)", args.slot or "all")
             run_all_groups()
         return
 
