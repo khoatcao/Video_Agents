@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -46,6 +47,7 @@ def render_node(state: PipelineState) -> dict:
     """
     scene_plan = state.get("scene_plan", [])
     slot: str = state.get("slot", "morning")
+    topic: str = state.get("topic", "")
 
     if not scene_plan:
         err = "scene_plan is empty — cannot determine total_frames for render."
@@ -66,8 +68,9 @@ def render_node(state: PipelineState) -> dict:
     logger.info("[RenderAgent] scene_plan frames=%d (actual TSX duration may differ after validation)", total_frames)
 
     # ── 2. Build output path ───────────────────────────────────────────────────
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    mp4_path = str(OUTPUT_DIR / f"{slot}_{timestamp}.mp4")
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    topic_slug = re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")[:60]
+    mp4_path = str(OUTPUT_DIR / f"{date_str}_{topic_slug}.mp4")
 
     # ── 3. Build scene_data payload ────────────────────────────────────────────
     scene_data = {
