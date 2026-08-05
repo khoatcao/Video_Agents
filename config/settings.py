@@ -61,7 +61,6 @@ MODEL_AFFILIATE: str = "qwen2.5:7b"
 # ── YouTube OAuth2 (optional — leave blank to skip upload) ───────────────────
 YOUTUBE_CLIENT_ID: str = _optional("YOUTUBE_CLIENT_ID")
 YOUTUBE_CLIENT_SECRET: str = _optional("YOUTUBE_CLIENT_SECRET")
-YOUTUBE_REFRESH_TOKEN: str = _optional("YOUTUBE_REFRESH_TOKEN")
 
 # ── Facebook / Meta Graph API (optional — leave blank to skip upload) ─────────
 FACEBOOK_APP_ID: str = _optional("FACEBOOK_APP_ID")
