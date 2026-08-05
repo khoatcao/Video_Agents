@@ -195,6 +195,11 @@ def upload_facebook_reel(mp4_path: str, caption: str) -> str:
     if not path.is_file():
         raise FileNotFoundError(f"MP4 not found: {mp4_path}")
 
+    if not FACEBOOK_PAGE_ID:
+        raise FacebookAPIError("FACEBOOK_PAGE_ID is not set in .env")
+    if not FACEBOOK_ACCESS_TOKEN:
+        raise FacebookAPIError("FACEBOOK_ACCESS_TOKEN is not set in .env")
+
     file_size = path.stat().st_size
 
     # Step 1: Initialise upload session

@@ -95,7 +95,7 @@ def upload_youtube_short(
             "description": description,
             "tags": tags,
             "categoryId": category_id,
-            "defaultLanguage": "vi",
+            "defaultLanguage": "en",
         },
         "status": {
             "privacyStatus": privacy_status,

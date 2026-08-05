@@ -17,8 +17,9 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
-from config.settings import MODEL_FAST, OLLAMA_BASE_URL, TEMPERATURE_METADATA
+from config.settings import MODEL_FAST, OLLAMA_BASE_URL, TEMPERATURE_METADATA, YOUTUBE_CLIENT_ID
 from state.pipeline_state import PipelineState
+from tools.youtube_api import upload_youtube_short
 
 logger = logging.getLogger(__name__)
 
@@ -151,4 +152,25 @@ def youtube_node(state: PipelineState) -> dict:
     except Exception as exc:
         logger.warning("[YouTubeAgent] Could not write metadata.txt: %s", exc)
 
-    return {"youtube_url": ""}
+    # ── 3. Upload to YouTube ───────────────────────────────────────────────────
+    if not YOUTUBE_CLIENT_ID:
+        logger.info("[YouTubeAgent] YOUTUBE_CLIENT_ID not set — skipping upload.")
+        return {"youtube_url": ""}
+
+    logger.info("[YouTubeAgent] Uploading %s to YouTube …", mp4_path)
+    try:
+        youtube_url = upload_youtube_short(
+            mp4_path=mp4_path,
+            title=title,
+            description=description,
+            tags=tags,
+        )
+        logger.info("[YouTubeAgent] Upload complete → %s", youtube_url)
+        return {"youtube_url": youtube_url}
+    except FileNotFoundError as exc:
+        logger.error("[YouTubeAgent] %s", exc)
+        return {"error": str(exc), "status": "failed"}
+    except Exception as exc:
+        err = f"YouTube upload failed: {exc}"
+        logger.error("[YouTubeAgent] %s", err)
+        return {"error": err, "status": "failed"}
