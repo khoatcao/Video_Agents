@@ -2,10 +2,8 @@
 YouTube Agent node for the LangGraph video-generation pipeline.
 
 Responsibilities:
-  1. Use qwen2.5:7b to optimise the YouTube title and description for a
-     Vietnamese-speaking technical audience (SEO-friendly, correct length).
-  2. Call upload_youtube_short() to publish the MP4 as a Short.
-  3. Return the public YouTube URL in the state update.
+  1. Optimise YouTube title, description, and tags with an LLM.
+  2. Write metadata.txt into the video subfolder for manual upload.
 """
 
 from __future__ import annotations
@@ -19,9 +17,8 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
-from config.settings import MODEL_FAST, OLLAMA_BASE_URL, YOUTUBE_CLIENT_ID
+from config.settings import MODEL_FAST, OLLAMA_BASE_URL
 from state.pipeline_state import PipelineState
-from tools.youtube_api import upload_youtube_short
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +40,6 @@ def _strip_think_tags(text: str) -> str:
 
 
 def _safe_extract_json(text: str) -> dict[str, Any]:
-    """Return the first JSON object found in *text*, or {} on failure."""
     text = _strip_think_tags(text)
     try:
         return json.loads(text)
@@ -61,42 +57,36 @@ def _safe_extract_json(text: str) -> dict[str, Any]:
 
 def youtube_node(state: PipelineState) -> dict:
     """
-    LangGraph node: optimise YouTube metadata and upload the Short.
+    LangGraph node: optimise YouTube metadata and write metadata.txt for manual upload.
 
     Reads:
         state["mp4_path"], state["youtube_metadata"]
 
     Writes:
-        youtube_url
+        youtube_url (empty — manual upload)
         — or —
         error, status (on failure)
     """
     mp4_path: str = state.get("mp4_path", "")
     youtube_metadata: dict = state.get("youtube_metadata", {})
 
-    if not YOUTUBE_CLIENT_ID:
-        logger.info("[YouTubeAgent] YOUTUBE_CLIENT_ID not set — skipping upload.")
-        return {"youtube_url": ""}
-
     if not mp4_path:
-        err = "mp4_path is empty — cannot upload to YouTube."
+        err = "mp4_path is empty — render must have failed."
         logger.error("[YouTubeAgent] %s", err)
         return {"error": err, "status": "failed"}
 
-    # ── 1. Optimise metadata with qwen2.5:7b ───────────────────────────────────
+    # ── 1. Optimise metadata ───────────────────────────────────────────────────
     llm = ChatOllama(
         model=MODEL_FAST,
         base_url=OLLAMA_BASE_URL,
         temperature=0.5,
         format="json",
     )
-
     human_message = (
         "Optimise the following YouTube metadata for an English-speaking technical audience:\n\n"
         f"```json\n{json.dumps(youtube_metadata, ensure_ascii=False, indent=2)}\n```\n\n"
         "Return the optimised JSON matching the required schema."
     )
-
     messages = [
         SystemMessage(content=_YOUTUBE_OPTIMISER_PROMPT),
         HumanMessage(content=human_message),
@@ -110,51 +100,31 @@ def youtube_node(state: PipelineState) -> dict:
         parsed = _safe_extract_json(raw_content)
         if parsed.get("title") and parsed.get("description"):
             optimised.update(parsed)
-            logger.debug("[YouTubeAgent] Metadata optimised successfully.")
         else:
-            logger.warning("[YouTubeAgent] LLM returned incomplete metadata; using original.")
+            logger.warning("[YouTubeAgent] LLM returned incomplete metadata — using original.")
     except Exception as exc:
         logger.warning("[YouTubeAgent] Metadata optimisation failed: %s — using original.", exc)
 
-    title: str = optimised.get("title", "AI Video #Shorts")
+    title: str = optimised.get("title", "AI Video")
     description: str = optimised.get("description", "")
     tags: list[str] = optimised.get("tags", [])
-    category_id: str = str(optimised.get("category_id", "28"))
 
-    # ── 2. Write metadata.txt into the video's subfolder ──────────────────────
+    # ── 2. Write metadata.txt ──────────────────────────────────────────────────
     video_dir = Path(mp4_path).parent
     hashtags = " ".join(f"#{t.lstrip('#')}" for t in tags)
-    metadata_lines = [
+    metadata = "\n".join([
         f"Title: {title} #Shorts",
         "",
-        f"Description:\n{description}",
+        "Description:",
+        description,
         "",
-        f"Hashtags:\n{hashtags}",
-    ]
+        "Hashtags:",
+        hashtags,
+    ])
     try:
-        (video_dir / "metadata.txt").write_text("\n".join(metadata_lines), encoding="utf-8")
-        logger.info("[YouTubeAgent] metadata.txt written → %s", video_dir / "metadata.txt")
+        (video_dir / "metadata.txt").write_text(metadata, encoding="utf-8")
+        logger.info("[YouTubeAgent] Ready for manual upload → %s", video_dir)
     except Exception as exc:
         logger.warning("[YouTubeAgent] Could not write metadata.txt: %s", exc)
 
-    # ── 3. Upload to YouTube ───────────────────────────────────────────────────
-    logger.info("[YouTubeAgent] Uploading %s to YouTube …", mp4_path)
-    try:
-        youtube_url = upload_youtube_short(
-            mp4_path=mp4_path,
-            title=title,
-            description=description,
-            tags=tags,
-            category_id=category_id,
-        )
-    except FileNotFoundError as exc:
-        err = str(exc)
-        logger.error("[YouTubeAgent] %s", err)
-        return {"error": err, "status": "failed"}
-    except Exception as exc:
-        err = f"YouTube upload failed: {exc}"
-        logger.error("[YouTubeAgent] %s", err)
-        return {"error": err, "status": "failed"}
-
-    logger.info("[YouTubeAgent] Upload complete → %s", youtube_url)
-    return {"youtube_url": youtube_url}
+    return {"youtube_url": ""}
