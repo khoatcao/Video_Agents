@@ -2,10 +2,9 @@
 Main LangGraph pipeline for the video-generation system.
 
 Active topology:
-  START → content ──(retry loop)──► remotion ──(retry loop)──► render ──(retry loop)──► youtube → END
-
-Disabled (re-enable when Facebook API is ready):
-  render → affiliate_pre → facebook → affiliate_post → END
+                                                                    ┌─► youtube → END
+  START → content → remotion → render ──(retry loop)──► publish ──►┤
+                                                                    └─► facebook → END
 
 Retry loops: content_retry → content, remotion_retry → remotion, render_retry → render.
 On exhausted retries, each node routes to fail_node → END.
@@ -18,13 +17,17 @@ import logging
 from langgraph.graph import END, START, StateGraph
 
 from agents.content import content_node
-# from agents.facebook import facebook_node          # disabled — re-enable when FB API ready
-# from agents.affiliate import affiliate_pre_node, affiliate_post_node  # disabled
+from agents.facebook import facebook_node
 from agents.orchestrator import fail_node, handle_error, should_retry
 from agents.remotion_agent import remotion_node
 from agents.render import render_node
 from agents.youtube import youtube_node
 from state.pipeline_state import PipelineState, create_initial_state
+
+
+def publish_fanout(state: PipelineState) -> dict:
+    """Passthrough node — fans out to youtube and facebook in parallel after render."""
+    return {}
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +52,10 @@ def build_graph() -> StateGraph:
     graph.add_node("render", render_node)
     graph.add_node("render_retry", handle_error)
 
+    graph.add_node("publish", publish_fanout)
     graph.add_node("youtube", youtube_node)
+    graph.add_node("facebook", facebook_node)
     graph.add_node("fail", fail_node)
-
-    # Disabled nodes — uncomment to re-enable Facebook posting:
-    # graph.add_node("affiliate_pre", affiliate_pre_node)
-    # graph.add_node("facebook", facebook_node)
-    # graph.add_node("affiliate_post", affiliate_post_node)
 
     # ── Entry point ────────────────────────────────────────────────────────────
     graph.add_edge(START, "content")
@@ -91,21 +91,16 @@ def build_graph() -> StateGraph:
         {
             "retry": "render_retry",
             "fail": "fail",
-            "continue": "youtube",
-            # "continue": "affiliate_pre",  # swap this when re-enabling Facebook
+            "continue": "publish",
         },
     )
     graph.add_edge("render_retry", "render")
 
-    # ── YouTube → END (manual upload) ─────────────────────────────────────────
+    # ── Fan-out: youtube (metadata.txt) + facebook (Reel) run in parallel ─────
+    graph.add_edge("publish", "youtube")
+    graph.add_edge("publish", "facebook")
     graph.add_edge("youtube", END)
-
-    # Disabled — Facebook routing (uncomment to re-enable):
-    # graph.add_edge("affiliate_pre", "youtube")
-    # graph.add_edge("affiliate_pre", "facebook")
-    # graph.add_edge("youtube", END)
-    # graph.add_edge("facebook", "affiliate_post")
-    # graph.add_edge("affiliate_post", END)
+    graph.add_edge("facebook", END)
 
     # ── Failure terminal ──────────────────────────────────────────────────────
     graph.add_edge("fail", END)
@@ -136,9 +131,9 @@ def run_pipeline_graph(topic: str, slot: str) -> PipelineState:
         final_state["status"] = "completed"
 
     logger.info(
-        "[Pipeline] Finished. status=%r  youtube_url=%r  facebook_url=%r",
+        "[Pipeline] Finished. status=%r  youtube_url=%r  facebook_post_id=%r",
         final_state.get("status"),
         final_state.get("youtube_url"),
-        final_state.get("facebook_url"),
+        final_state.get("facebook_post_id"),
     )
     return final_state  # type: ignore[return-value]
