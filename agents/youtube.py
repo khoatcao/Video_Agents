@@ -19,6 +19,7 @@ from langchain_ollama import ChatOllama
 
 from config.settings import MODEL_FAST, OLLAMA_BASE_URL, TEMPERATURE_METADATA, YOUTUBE_CLIENT_ID
 from state.pipeline_state import PipelineState
+from tools.audio import mix_music
 from tools.youtube_api import upload_youtube_short
 
 logger = logging.getLogger(__name__)
@@ -157,10 +158,12 @@ def youtube_node(state: PipelineState) -> dict:
         logger.info("[YouTubeAgent] YOUTUBE_CLIENT_ID not set — skipping upload.")
         return {"youtube_url": ""}
 
-    logger.info("[YouTubeAgent] Uploading %s to YouTube …", mp4_path)
+    upload_path = mix_music(mp4_path, platform="youtube")
+
+    logger.info("[YouTubeAgent] Uploading %s to YouTube …", upload_path)
     try:
         youtube_url = upload_youtube_short(
-            mp4_path=mp4_path,
+            mp4_path=upload_path,
             title=title,
             description=description,
             tags=tags,

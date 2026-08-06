@@ -20,6 +20,7 @@ from langchain_ollama import ChatOllama
 
 from config.settings import FACEBOOK_ACCESS_TOKEN, FACEBOOK_PAGE_ID, MODEL_FAST, OLLAMA_BASE_URL
 from state.pipeline_state import PipelineState
+from tools.audio import mix_music
 from tools.facebook_api import upload_facebook_reel
 
 logger = logging.getLogger(__name__)
@@ -154,10 +155,13 @@ def facebook_node(state: PipelineState) -> dict:
     if len(full_caption) > 2200:
         full_caption = full_caption[:2197] + "..."
 
-    # ── 2. Upload Reel to Facebook ─────────────────────────────────────────────
-    logger.info("[FacebookAgent] Uploading %s to Facebook …", mp4_path)
+    # ── 2. Mix Facebook Sound Collection music ────────────────────────────────
+    upload_path = mix_music(mp4_path, platform="facebook")
+
+    # ── 3. Upload Reel to Facebook ─────────────────────────────────────────────
+    logger.info("[FacebookAgent] Uploading %s to Facebook …", upload_path)
     try:
-        post_id = upload_facebook_reel(mp4_path=mp4_path, caption=full_caption)
+        post_id = upload_facebook_reel(mp4_path=upload_path, caption=full_caption)
     except FileNotFoundError as exc:
         err = str(exc)
         logger.error("[FacebookAgent] %s", err)

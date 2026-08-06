@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import logging
-import random
 import re
 import subprocess
 from datetime import datetime
@@ -138,65 +137,7 @@ def render_node(state: PipelineState) -> dict:
         return {"error": err, "status": "failed"}
 
     logger.info("[RenderAgent] Render complete → %s", resolved_path)
-
-    # ── 5. Mix in background music (optional) ─────────────────────────────────
-    resolved_path = _mix_music(resolved_path)
-
     return {
         "mp4_path": resolved_path,
         "error": None,
     }
-
-
-_MUSIC_DIR = _PROJECT_ROOT / "assets" / "music"
-
-
-def _mix_music(mp4_path: str) -> str:
-    """
-    Mix a random track from assets/music/ into the video at 20% volume.
-
-    Returns the original path unchanged if no tracks are found or ffmpeg fails.
-    Download tracks from Facebook Sound Collection and place them in assets/music/.
-    """
-    tracks = list(_MUSIC_DIR.glob("*.mp3")) + list(_MUSIC_DIR.glob("*.m4a")) + list(_MUSIC_DIR.glob("*.mp4"))
-    if not tracks:
-        logger.info("[RenderAgent] No music tracks in %s — skipping audio mix.", _MUSIC_DIR)
-        return mp4_path
-
-    track = random.choice(tracks)
-    output_path = mp4_path.replace(".mp4", "_music.mp4")
-
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", mp4_path,
-        "-i", str(track),
-        "-map", "0:v",
-        "-map", "1:a",
-        "-filter:a", "volume=0.2",
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-shortest",
-        output_path,
-    ]
-
-    logger.info("[RenderAgent] Mixing music track: %s", track.name)
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120
-        )
-    except FileNotFoundError:
-        logger.warning("[RenderAgent] ffmpeg not found — skipping audio mix.")
-        return mp4_path
-    except subprocess.TimeoutExpired:
-        logger.warning("[RenderAgent] ffmpeg timed out — skipping audio mix.")
-        return mp4_path
-
-    if result.returncode != 0:
-        logger.warning("[RenderAgent] ffmpeg failed: %s", result.stderr[-500:])
-        return mp4_path
-
-    # Replace original with music-mixed version
-    Path(mp4_path).unlink(missing_ok=True)
-    Path(output_path).rename(mp4_path)
-    logger.info("[RenderAgent] Audio mixed → %s", mp4_path)
-    return mp4_path
