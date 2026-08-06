@@ -158,7 +158,7 @@ def _mix_music(mp4_path: str) -> str:
     Returns the original path unchanged if no tracks are found or ffmpeg fails.
     Download tracks from Facebook Sound Collection and place them in assets/music/.
     """
-    tracks = list(_MUSIC_DIR.glob("*.mp3")) + list(_MUSIC_DIR.glob("*.m4a"))
+    tracks = list(_MUSIC_DIR.glob("*.mp3")) + list(_MUSIC_DIR.glob("*.m4a")) + list(_MUSIC_DIR.glob("*.mp4"))
     if not tracks:
         logger.info("[RenderAgent] No music tracks in %s — skipping audio mix.", _MUSIC_DIR)
         return mp4_path
