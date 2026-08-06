@@ -130,10 +130,10 @@ def affiliate_pre_node(state: PipelineState) -> dict:
     candidates_json = json.dumps(candidate_products, ensure_ascii=False, indent=2)
 
     human_message = (
-        f"Chủ đề video: {topic}\n\n"
-        f"Tóm tắt 3 scene đầu:\n{scene_summary}\n\n"
-        f"Danh sách sản phẩm tìm thấy:\n{candidates_json}\n\n"
-        "Hãy chọn tối đa 3 sản phẩm phù hợp nhất và trả về mảng JSON theo schema quy định."
+        f"Video topic: {topic}\n\n"
+        f"First 3 scenes summary:\n{scene_summary}\n\n"
+        f"Candidate products found:\n{candidates_json}\n\n"
+        "Select the 3 most relevant products and return a JSON array matching the required schema."
     )
 
     llm = ChatOllama(

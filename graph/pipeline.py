@@ -2,9 +2,9 @@
 Main LangGraph pipeline for the video-generation system.
 
 Active topology:
-                                                                    ┌─► youtube → END
-  START → content → remotion → render ──(retry loop)──► publish ──►┤
-                                                                    └─► facebook → END
+                                                                              ┌─► youtube → END
+  START → content → remotion → render ──(retry loop)──► affiliate_pre ──► publish ──►┤
+                                                                              └─► facebook → affiliate_post → END
 
 Retry loops: content_retry → content, remotion_retry → remotion, render_retry → render.
 On exhausted retries, each node routes to fail_node → END.
@@ -16,6 +16,7 @@ import logging
 
 from langgraph.graph import END, START, StateGraph
 
+from agents.affiliate import affiliate_post_node, affiliate_pre_node
 from agents.content import content_node
 from agents.facebook import facebook_node
 from agents.orchestrator import fail_node, handle_error, should_retry
@@ -52,9 +53,11 @@ def build_graph() -> StateGraph:
     graph.add_node("render", render_node)
     graph.add_node("render_retry", handle_error)
 
+    graph.add_node("affiliate_pre", affiliate_pre_node)
     graph.add_node("publish", publish_fanout)
     graph.add_node("youtube", youtube_node)
     graph.add_node("facebook", facebook_node)
+    graph.add_node("affiliate_post", affiliate_post_node)
     graph.add_node("fail", fail_node)
 
     # ── Entry point ────────────────────────────────────────────────────────────
@@ -91,16 +94,22 @@ def build_graph() -> StateGraph:
         {
             "retry": "render_retry",
             "fail": "fail",
-            "continue": "publish",
+            "continue": "affiliate_pre",
         },
     )
     graph.add_edge("render_retry", "render")
+
+    # ── Affiliate pre: fetch + rank products before upload ─────────────────────
+    graph.add_edge("affiliate_pre", "publish")
 
     # ── Fan-out: youtube (metadata.txt) + facebook (Reel) run in parallel ─────
     graph.add_edge("publish", "youtube")
     graph.add_edge("publish", "facebook")
     graph.add_edge("youtube", END)
-    graph.add_edge("facebook", END)
+
+    # ── Affiliate post: comment affiliate links after Facebook upload ──────────
+    graph.add_edge("facebook", "affiliate_post")
+    graph.add_edge("affiliate_post", END)
 
     # ── Failure terminal ──────────────────────────────────────────────────────
     graph.add_edge("fail", END)
