@@ -1,5 +1,6 @@
 .env
 youtube_token.json
+facebook_token.json
 client_secret.json
 __pycache__/
 *.pyc
