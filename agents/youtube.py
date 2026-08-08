@@ -160,6 +160,15 @@ def youtube_node(state: PipelineState) -> dict:
 
     upload_path = mix_music(mp4_path, platform="youtube")
 
+    # Append source link to description
+    if source or source_url:
+        source_block = "\n\n📰 Source:"
+        if source:
+            source_block += f" {source}"
+        if source_url:
+            source_block += f"\n🔗 {source_url}"
+        description = description.rstrip() + source_block
+
     logger.info("[YouTubeAgent] Uploading %s to YouTube …", upload_path)
     try:
         youtube_url = upload_youtube_short(

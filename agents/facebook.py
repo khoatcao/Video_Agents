@@ -157,6 +157,24 @@ def facebook_node(state: PipelineState) -> dict:
     if not full_caption:
         full_caption = _build_fallback_caption(state)
 
+    # Always ensure hashtags are appended — LLM sometimes omits them
+    hashtags: list = facebook_metadata.get("hashtags", [])
+    if hashtags:
+        hashtag_str = " ".join(h if h.startswith("#") else f"#{h}" for h in hashtags)
+        if hashtag_str not in full_caption:
+            full_caption = full_caption.rstrip() + "\n\n" + hashtag_str
+
+    # Append source link for credibility
+    source: str = state.get("source", "")
+    source_url: str = state.get("source_url", "")
+    if source or source_url:
+        source_block = "\n\n📰 Nguồn:"
+        if source:
+            source_block += f" {source}"
+        if source_url:
+            source_block += f"\n🔗 {source_url}"
+        full_caption = full_caption.rstrip() + source_block
+
     # Truncate to Facebook's 2200-char caption limit
     if len(full_caption) > 2200:
         full_caption = full_caption[:2197] + "..."
