@@ -55,16 +55,6 @@ Rules:
 - accent_color: one of "#3b82f6" | "#10b981" | "#f59e0b" | "#ef4444".
 - First scene must be "title", last scene must be "cta".
 
-## vi_scene_plan rules
-- vi_scene_plan is a Vietnamese version of scene_plan for Facebook Reels.
-- Same number of scenes, same scene_type, same duration_frames, same accent_color.
-- heading, subheading, bullets, steps — ALL must be in Vietnamese.
-- Vietnamese hook must be equally shocking/curious as the English hook.
-- Vietnamese hook patterns:
-  ✅ "AI này vừa sa thải 300 kỹ sư của [Công ty]"
-  ✅ "90% lập trình viên dùng Docker SAI cách này"
-  ✅ "Công cụ $0 này đánh bại [Tool Trả Tiền] mọi mặt"
-
 ## Required JSON schema
 ```json
 {
@@ -98,28 +88,6 @@ Rules:
       "bullets": null,
       "steps": ["Step 1 detail", "Step 2 detail", "Step 3 detail"],
       "accent_color": "#10b981"
-    }
-  ],
-  "vi_scene_plan": [
-    {
-      "scene_num": 1,
-      "duration_frames": 270,
-      "scene_type": "title",
-      "heading": "Hook tiếng Việt gây sốc tối đa 10 từ",
-      "subheading": "Câu phụ tiếng Việt hoặc null",
-      "bullets": null,
-      "steps": null,
-      "accent_color": "#3b82f6"
-    },
-    {
-      "scene_num": 2,
-      "duration_frames": 300,
-      "scene_type": "bullets",
-      "heading": "Vấn đề cốt lõi",
-      "subheading": null,
-      "bullets": ["Điểm cụ thể 1", "Điểm cụ thể 2", "Điểm cụ thể 3"],
-      "steps": null,
-      "accent_color": "#ef4444"
     }
   ],
   "youtube_metadata": {

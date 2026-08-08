@@ -143,12 +143,8 @@ def content_node(state: PipelineState) -> dict:
         return {"error": err, "status": "failed"}
 
     scene_plan = data["scene_plan"]
-    vi_scene_plan = data.get("vi_scene_plan", [])
     youtube_metadata = data["youtube_metadata"]
     facebook_metadata = data["facebook_metadata"]
-
-    if not vi_scene_plan:
-        logger.warning("[ContentAgent] vi_scene_plan missing — Facebook will use English video.")
 
     # Ensure category_id has the right default
     if "category_id" not in youtube_metadata:
@@ -164,7 +160,6 @@ def content_node(state: PipelineState) -> dict:
         "source": primary_source,
         "source_url": primary_source_url,
         "scene_plan": scene_plan,
-        "vi_scene_plan": vi_scene_plan,
         "youtube_metadata": youtube_metadata,
         "facebook_metadata": facebook_metadata,
         "error": None,

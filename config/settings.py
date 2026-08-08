@@ -53,10 +53,10 @@ TEMPERATURE_METADATA: float = float(_optional("TEMPERATURE_METADATA", "0.0"))
 # All agents use qwen2.5:7b — single lightweight model, low VRAM (~5 GB),
 # sufficient for Vietnamese content, code generation, and product matching
 # at this video-generation workload.
-MODEL_REASONING: str = "qwen2.5:7b"
-MODEL_CODE: str = "qwen2.5:7b"
-MODEL_FAST: str = "qwen2.5:7b"
-MODEL_AFFILIATE: str = "qwen2.5:7b"
+MODEL_REASONING: str = "llama3.1:8b"
+MODEL_CODE: str = "llama3.1:8b"
+MODEL_FAST: str = "llama3.1:8b"
+MODEL_AFFILIATE: str = "llama3.1:8b"
 
 # ── YouTube OAuth2 (optional — leave blank to skip upload) ───────────────────
 YOUTUBE_CLIENT_ID: str = _optional("YOUTUBE_CLIENT_ID")

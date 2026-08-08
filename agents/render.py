@@ -17,8 +17,11 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_ollama import ChatOllama
+
 from agents.remotion_agent import _build_tsx, _validate_scenes
-from config.settings import OUTPUT_DIR
+from config.settings import MODEL_FAST, OLLAMA_BASE_URL, OUTPUT_DIR
 from state.pipeline_state import PipelineState
 
 logger = logging.getLogger(__name__)
@@ -149,6 +152,45 @@ def render_node(state: PipelineState) -> dict:
     }
 
 
+_VI_TRANSLATE_PROMPT = """\
+You are a Vietnamese translator for short-form video scripts.
+Translate the English scene_plan JSON to Vietnamese. Rules:
+- Keep scene_num, duration_frames, scene_type, accent_color UNCHANGED.
+- Translate heading, subheading, bullets, steps to Vietnamese.
+- The first scene heading MUST be a shocking/curiosity-gap hook in Vietnamese (max 10 words).
+  Example patterns: "AI này vừa sa thải 300 kỹ sư", "90%% lập trình viên dùng Docker SAI"
+- Keep text short and punchy — same tight style as the English original.
+- Return ONLY a valid JSON array. No explanation.
+"""
+
+
+def _translate_to_vi(scene_plan: list) -> list:
+    """Call LLM to translate English scene_plan to Vietnamese. Returns [] on failure."""
+    llm = ChatOllama(
+        model=MODEL_FAST,
+        base_url=OLLAMA_BASE_URL,
+        temperature=0.3,
+        format="json",
+    )
+    try:
+        response = llm.invoke([
+            SystemMessage(content=_VI_TRANSLATE_PROMPT),
+            HumanMessage(content=json.dumps(scene_plan, ensure_ascii=False, indent=2)),
+        ])
+        raw = response.content if hasattr(response, "content") else str(response)
+        import re as _re
+        raw = _re.sub(r"<think>.*?</think>", "", raw, flags=_re.DOTALL).strip()
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            return parsed
+        for v in parsed.values():
+            if isinstance(v, list):
+                return v
+    except Exception as exc:
+        logger.warning("[RenderAgent] Vietnamese translation failed: %s", exc)
+    return []
+
+
 def _render_vi(state: PipelineState, en_mp4_path: str, name: str) -> str:
     """
     Render Vietnamese version of the video for Facebook Reels.
@@ -156,7 +198,10 @@ def _render_vi(state: PipelineState, en_mp4_path: str, name: str) -> str:
     """
     vi_scene_plan = state.get("vi_scene_plan", [])
     if not vi_scene_plan:
-        logger.info("[RenderAgent] No vi_scene_plan — skipping Vietnamese render.")
+        logger.info("[RenderAgent] Translating scene_plan to Vietnamese for Facebook...")
+        vi_scene_plan = _translate_to_vi(state.get("scene_plan", []))
+    if not vi_scene_plan:
+        logger.warning("[RenderAgent] Vietnamese translation returned empty — skipping VI render.")
         return ""
 
     vi_scenes = _validate_scenes(vi_scene_plan)
