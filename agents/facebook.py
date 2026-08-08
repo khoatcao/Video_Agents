@@ -163,19 +163,13 @@ def facebook_node(state: PipelineState) -> dict:
         if hashtag_str not in full_caption:
             full_caption = full_caption.rstrip() + "\n\n" + hashtag_str
 
-    # Append affiliate links directly in caption (avoids pages_manage_engagement App Review)
+    # Append affiliate links directly in caption
     if affiliate_links:
-        aff_lines = ["\n\n🛒 Link liên quan:"]
+        aff_lines = ["\n\n🛒 Link sản phẩm:"]
         for p in affiliate_links:
-            name = p.get("product_name", "")
             url = p.get("url", "")
-            commission = p.get("price_range", "")
-            line = f"• {name}"
-            if commission and "Xem" not in commission:
-                line += f" ({commission})"
             if url:
-                line += f"\n  👉 {url}"
-            aff_lines.append(line)
+                aff_lines.append(f"👉 {url}")
         full_caption = full_caption.rstrip() + "\n".join(aff_lines)
 
     # Append source link for credibility
