@@ -187,18 +187,22 @@ def upload_facebook_reel(mp4_path: str, caption: str) -> str:
         timeout=_API_TIMEOUT,
     )
     publish_data = _check(publish_resp)
+    logger.info("Facebook Reel publish response: %s", publish_data)
     post_id: str = publish_data.get("post_id") or f"{FACEBOOK_PAGE_ID}_{video_id}"
-    logger.info("Facebook Reel published. post_id=%s", post_id)
+    logger.info("Facebook Reel published. post_id=%s  video_id=%s", post_id, video_id)
     return post_id
 
 
 def post_facebook_comment(post_id: str, comment: str) -> str:
+    url = f"{_GRAPH_BASE}/{post_id}/comments"
+    logger.info("Posting comment to %s", url)
     resp = requests.post(
-        f"{_GRAPH_BASE}/{post_id}/comments",
+        url,
         params={"access_token": FACEBOOK_ACCESS_TOKEN},
         json={"message": comment},
         timeout=_API_TIMEOUT,
     )
+    logger.debug("Comment response status=%d body=%s", resp.status_code, resp.text[:300])
     data = _check(resp)
     comment_id: str = data["id"]
     logger.info("Facebook comment posted. comment_id=%s", comment_id)

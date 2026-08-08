@@ -9,6 +9,7 @@ Affiliate Agent nodes for the LangGraph video-generation pipeline.
 from __future__ import annotations
 
 import logging
+import time
 
 from state.pipeline_state import PipelineState
 from tools.affiliate_api import (
@@ -91,16 +92,33 @@ def affiliate_post_node(state: PipelineState) -> dict:
         logger.info("[AffiliateAgent/post] Formatted comment is empty; skipping post.")
         return {"status": "completed"}
 
-    # ── Post comment to Facebook ───────────────────────────────────────────────
+    # ── Post comment to Facebook (with retry — video needs processing time) ──────
     logger.info(
         "[AffiliateAgent/post] Posting affiliate comment to post_id=%s", facebook_post_id
     )
-    try:
-        comment_id = post_facebook_comment(facebook_post_id, comment_text)
-        logger.info("[AffiliateAgent/post] Comment posted. comment_id=%s", comment_id)
-    except Exception as exc:
-        logger.error("[AffiliateAgent/post] Failed to post comment: %s", exc)
-        # Non-fatal — the video is already published; just log the failure.
-        return {"status": "completed"}
+    _MAX_ATTEMPTS = 3
+    _WAIT_SECONDS = 20
 
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            comment_id = post_facebook_comment(facebook_post_id, comment_text)
+            logger.info("[AffiliateAgent/post] Comment posted. comment_id=%s", comment_id)
+            return {"status": "completed"}
+        except Exception as exc:
+            logger.warning(
+                "[AffiliateAgent/post] Attempt %d/%d failed: %s",
+                attempt, _MAX_ATTEMPTS, exc,
+            )
+            if attempt < _MAX_ATTEMPTS:
+                logger.info(
+                    "[AffiliateAgent/post] Waiting %ds for Facebook to process reel before retry…",
+                    _WAIT_SECONDS,
+                )
+                time.sleep(_WAIT_SECONDS)
+
+    logger.error(
+        "[AffiliateAgent/post] All %d attempts failed — affiliate comment NOT posted. "
+        "post_id=%s",
+        _MAX_ATTEMPTS, facebook_post_id,
+    )
     return {"status": "completed"}
