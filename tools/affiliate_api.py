@@ -23,10 +23,11 @@ logger = logging.getLogger(__name__)
 _BASE_URL = "https://api.accesstrade.vn/v1"
 _REQUEST_TIMEOUT = 15
 
-_HEADERS = {
-    "Authorization": f"Token {ACCESSTRADE_API_KEY}",
-    "Content-Type": "application/json",
-}
+def _headers() -> dict:
+    return {
+        "Authorization": f"Token {ACCESSTRADE_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
 
 # ── Hot/trending products ──────────────────────────────────────────────────────
@@ -48,12 +49,13 @@ def get_hot_products(limit: int = 10) -> list[dict[str, str]]:
     try:
         resp = requests.get(
             f"{_BASE_URL}/top_products",
-            headers=_HEADERS,
+            headers=_headers(),
             params={"date_from": date_from, "date_to": date_to},
             timeout=_REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
         data = resp.json()
+        logger.info("[AffiliateAPI] top_products raw response: %s", str(data)[:500])
         items = data.get("data", [])
         if not isinstance(items, list):
             items = []
@@ -100,7 +102,7 @@ def generate_affiliate_link(product_url: str, campaign_id: str = "") -> str:
 
         resp = requests.post(
             f"{_BASE_URL}/product_link/create",
-            headers=_HEADERS,
+            headers=_headers(),
             json=payload,
             timeout=_REQUEST_TIMEOUT,
         )
