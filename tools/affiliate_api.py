@@ -64,7 +64,14 @@ def get_hot_products(limit: int = 3) -> list[dict[str, str]]:
         return []
 
     # Step 2: Pick top campaigns by commission rate
-    campaigns.sort(key=lambda c: float(c.get("max_com", 0) or 0), reverse=True)
+    def _parse_commission(val) -> float:
+        try:
+            # Strip %, take first number before "/" (e.g. "4/9%" → 4.0, "14%" → 14.0)
+            return float(str(val).replace("%", "").split("/")[0].strip())
+        except (ValueError, TypeError):
+            return 0.0
+
+    campaigns.sort(key=lambda c: _parse_commission(c.get("max_com", 0)), reverse=True)
     top_campaigns = campaigns[:limit]
 
     # Step 3: Generate affiliate link for each campaign
@@ -79,7 +86,7 @@ def get_hot_products(limit: int = 3) -> list[dict[str, str]]:
             continue
 
         aff_link = generate_affiliate_link(url, campaign_id=campaign_id) or url
-        commission = f"Hoa hồng {max_com}%" if max_com else "Xem AccessTrade"
+        commission = f"Hoa hồng {max_com}%" if max_com and "%" not in str(max_com) else (f"Hoa hồng {max_com}" if max_com else "Xem AccessTrade")
 
         results.append({
             "product_name": name,
