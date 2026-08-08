@@ -20,7 +20,7 @@ from langchain_ollama import ChatOllama
 from config.settings import MODEL_FAST, OLLAMA_BASE_URL, TEMPERATURE_METADATA, YOUTUBE_CLIENT_ID
 from state.pipeline_state import PipelineState
 from tools.audio import mix_music
-from tools.youtube_api import upload_youtube_short
+from tools.youtube_api import post_youtube_comment, upload_youtube_short
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,6 @@ def youtube_node(state: PipelineState) -> dict:
             tags=tags,
         )
         logger.info("[YouTubeAgent] Upload complete → %s", youtube_url)
-        return {"youtube_url": youtube_url}
     except FileNotFoundError as exc:
         logger.error("[YouTubeAgent] %s", exc)
         return {"error": str(exc), "status": "failed"}
@@ -186,3 +185,18 @@ def youtube_node(state: PipelineState) -> dict:
         err = f"YouTube upload failed: {exc}"
         logger.error("[YouTubeAgent] %s", err)
         return {"error": err, "status": "failed"}
+
+    # ── 4. Post affiliate links as pinned comment ──────────────────────────────
+    affiliate_links: list = state.get("affiliate_links", [])
+    if affiliate_links:
+        urls = [p.get("url", "") for p in affiliate_links if p.get("url")]
+        if urls:
+            comment_text = "🛒 Link sản phẩm:\n" + "\n".join(f"👉 {u}" for u in urls)
+            video_id = youtube_url.split("/")[-1]
+            try:
+                post_youtube_comment(video_id, comment_text)
+                logger.info("[YouTubeAgent] Affiliate comment posted.")
+            except Exception as exc:
+                logger.warning("[YouTubeAgent] Comment post failed (non-fatal): %s", exc)
+
+    return {"youtube_url": youtube_url}

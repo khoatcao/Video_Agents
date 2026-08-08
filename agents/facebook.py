@@ -163,14 +163,9 @@ def facebook_node(state: PipelineState) -> dict:
         if hashtag_str not in full_caption:
             full_caption = full_caption.rstrip() + "\n\n" + hashtag_str
 
-    # Append affiliate links directly in caption
+    # Tease affiliate links in caption — actual links posted as comment by affiliate_post_node
     if affiliate_links:
-        aff_lines = ["\n\n🛒 Link sản phẩm:"]
-        for p in affiliate_links:
-            url = p.get("url", "")
-            if url:
-                aff_lines.append(f"👉 {url}")
-        full_caption = full_caption.rstrip() + "\n".join(aff_lines)
+        full_caption = full_caption.rstrip() + "\n\n👇 Link sản phẩm trong comment đầu tiên"
 
     # Append source link for credibility
     source: str = state.get("source", "")

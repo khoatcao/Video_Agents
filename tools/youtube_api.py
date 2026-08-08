@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 _YOUTUBE_API_SERVICE = "youtube"
 _YOUTUBE_API_VERSION = "v3"
-_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+_SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.force-ssl",  # needed for posting comments
+]
 _CHUNK_SIZE = 4 * 1024 * 1024  # 4 MiB
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -162,6 +165,26 @@ def upload_youtube_short(
     url = f"https://www.youtube.com/shorts/{video_id}"
     logger.info("[YouTubeAPI] Upload complete → %s", url)
     return url
+
+
+def post_youtube_comment(video_id: str, comment: str) -> str:
+    """
+    Post a top-level comment on a YouTube video and return the comment ID.
+    Requires youtube.force-ssl scope.
+    """
+    youtube = _build_youtube_client()
+    body = {
+        "snippet": {
+            "videoId": video_id,
+            "topLevelComment": {
+                "snippet": {"textOriginal": comment}
+            },
+        }
+    }
+    response = youtube.commentThreads().insert(part="snippet", body=body).execute()
+    comment_id: str = response["id"]
+    logger.info("[YouTubeAPI] Comment posted. comment_id=%s", comment_id)
+    return comment_id
 
 
 def upload_thumbnail(video_id: str, thumbnail_path: str) -> bool:
