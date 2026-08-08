@@ -29,28 +29,27 @@ _HEADERS = {
 }
 
 
-# ── Product search ─────────────────────────────────────────────────────────────
+# ── Hot/trending products ──────────────────────────────────────────────────────
 
-def search_accesstrade_products(keyword: str, limit: int = 5) -> list[dict[str, str]]:
+def get_hot_products(limit: int = 10) -> list[dict[str, str]]:
     """
-    Search AccessTrade product feed for items matching keyword.
+    Fetch currently hot/trending products from AccessTrade — no keyword needed.
 
-    Returns list of product dicts with: product_name, url, platform, price_range.
-    Falls back to empty list on error.
+    Sorted by click count (most clicked = most people are looking for).
+    Returns list of product dicts: product_name, url, platform, price_range.
     """
     if not ACCESSTRADE_API_KEY:
-        logger.warning("[AffiliateAPI] ACCESSTRADE_API_KEY not set — skipping search.")
+        logger.warning("[AffiliateAPI] ACCESSTRADE_API_KEY not set — skipping.")
         return []
 
-    limit = min(limit, 10)
+    limit = min(limit, 20)
     try:
         resp = requests.get(
             f"{_BASE_URL}/offers",
             headers=_HEADERS,
             params={
-                "keyword": keyword,
                 "page_size": limit,
-                "order_by": "click_count",
+                "order_by": "-click_count",  # descending = hottest first
             },
             timeout=_REQUEST_TIMEOUT,
         )
@@ -60,7 +59,7 @@ def search_accesstrade_products(keyword: str, limit: int = 5) -> list[dict[str, 
         if not isinstance(items, list):
             items = []
     except Exception as exc:
-        logger.warning("[AffiliateAPI] AccessTrade search failed for %r: %s", keyword, exc)
+        logger.warning("[AffiliateAPI] AccessTrade hot products failed: %s", exc)
         return []
 
     results: list[dict[str, str]] = []
@@ -73,9 +72,7 @@ def search_accesstrade_products(keyword: str, limit: int = 5) -> list[dict[str, 
         if not name or not url:
             continue
 
-        # Convert to affiliate link
         affiliate_url = generate_affiliate_link(url) or url
-
         price_str = f"{int(price):,} VND".replace(",", ".") if price else "Xem trên AccessTrade"
         results.append({
             "product_name": name,
@@ -84,7 +81,7 @@ def search_accesstrade_products(keyword: str, limit: int = 5) -> list[dict[str, 
             "price_range": price_str,
         })
 
-    logger.info("[AffiliateAPI] AccessTrade returned %d products for %r.", len(results), keyword)
+    logger.info("[AffiliateAPI] Got %d hot products from AccessTrade.", len(results))
     return results
 
 

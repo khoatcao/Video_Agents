@@ -26,7 +26,7 @@ from config.settings import MODEL_AFFILIATE, OLLAMA_BASE_URL
 from state.pipeline_state import PipelineState
 from tools.affiliate_api import (
     format_affiliate_comment,
-    search_accesstrade_products,
+    get_hot_products,
 )
 from tools.facebook_api import post_facebook_comment
 
@@ -103,76 +103,25 @@ def affiliate_pre_node(state: PipelineState) -> dict:
     """
     topic: str = state.get("topic", "")
     scene_plan = state.get("scene_plan", [])
-    keywords = _topic_to_keywords(topic)
-    primary_keyword = keywords[0]
 
-    logger.info("[AffiliateAgent/pre] Searching products for keyword=%r", primary_keyword)
+    logger.info("[AffiliateAgent/pre] Fetching hot products from AccessTrade...")
 
-    # ── 1. Fetch candidate products from AccessTrade ──────────────────────────
+    # ── 1. Fetch hot/trending products from AccessTrade ───────────────────────
     candidate_products: list[dict] = []
     try:
-        at_results = search_accesstrade_products(primary_keyword, limit=5)
-        candidate_products.extend(at_results)
-        logger.debug("[AffiliateAgent/pre] AccessTrade returned %d products.", len(at_results))
+        candidate_products = get_hot_products(limit=10)
+        logger.info("[AffiliateAgent/pre] Got %d hot products.", len(candidate_products))
     except Exception as exc:
-        logger.warning("[AffiliateAgent/pre] AccessTrade search failed: %s", exc)
+        logger.warning("[AffiliateAgent/pre] AccessTrade hot products failed: %s", exc)
 
     if not candidate_products:
-        logger.warning("[AffiliateAgent/pre] No candidate products found; returning empty list.")
+        logger.warning("[AffiliateAgent/pre] No hot products found; returning empty list.")
         return {"affiliate_links": []}
 
-    # ── 2. Ask LLM to pick the best 3 ─────────────────────────────────────────
-    scene_summary = json.dumps(
-        [{"description": s.get("description", ""), "text_overlay": s.get("text_overlay", "")}
-         for s in scene_plan[:3]],
-        ensure_ascii=False,
-    )
-    candidates_json = json.dumps(candidate_products, ensure_ascii=False, indent=2)
-
-    human_message = (
-        f"Video topic: {topic}\n\n"
-        f"First 3 scenes summary:\n{scene_summary}\n\n"
-        f"Candidate products found:\n{candidates_json}\n\n"
-        "Select the 3 most relevant products and return a JSON array matching the required schema."
-    )
-
-    llm = ChatOllama(
-        model=MODEL_AFFILIATE,
-        base_url=OLLAMA_BASE_URL,
-        temperature=0.3,
-        format="json",
-    )
-
-    messages = [
-        SystemMessage(content=AFFILIATE_AGENT_SYSTEM_PROMPT),
-        HumanMessage(content=human_message),
-    ]
-
-    logger.info("[AffiliateAgent/pre] Invoking %s …", MODEL_AFFILIATE)
-    try:
-        response = llm.invoke(messages)
-        raw_content: str = response.content if hasattr(response, "content") else str(response)
-    except Exception as exc:
-        logger.error("[AffiliateAgent/pre] LLM call failed: %s — using raw candidates.", exc)
-        return {"affiliate_links": candidate_products[:3]}
-
-    selected = _extract_json_array(raw_content)
-
-    # Validate: each item must have at minimum product_name and url
-    valid = [
-        p for p in selected
-        if isinstance(p, dict) and p.get("product_name") and p.get("url")
-    ][:3]
-
-    if not valid:
-        logger.warning(
-            "[AffiliateAgent/pre] LLM returned no valid products; using first %d raw candidates.",
-            min(3, len(candidate_products)),
-        )
-        valid = candidate_products[:3]
-
-    logger.info("[AffiliateAgent/pre] Selected %d affiliate products.", len(valid))
-    return {"affiliate_links": valid}
+    # Take top 3 hottest products directly — no LLM selection needed
+    top3 = candidate_products[:3]
+    logger.info("[AffiliateAgent/pre] Using top %d hot products.", len(top3))
+    return {"affiliate_links": top3}
 
 
 # ── Node 2: Post-upload comment with affiliate links ──────────────────────────
