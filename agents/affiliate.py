@@ -71,14 +71,15 @@ def affiliate_post_node(state: PipelineState) -> dict:
         error               — on failure (non-fatal; pipeline still finishes)
     """
     affiliate_links = state.get("affiliate_links", [])
-    facebook_post_id: str = state.get("facebook_post_id", "")
+    # Use video_id for comments — post_id uses the deprecated singular statuses API (error #12)
+    comment_target: str = state.get("facebook_video_id", "") or state.get("facebook_post_id", "")
 
     if not affiliate_links:
         logger.info("[AffiliateAgent/post] No affiliate links to post.")
         return {"status": "completed"}
 
-    if not facebook_post_id:
-        logger.warning("[AffiliateAgent/post] facebook_post_id is empty — cannot post comment.")
+    if not comment_target:
+        logger.warning("[AffiliateAgent/post] No facebook video_id — cannot post comment.")
         return {"status": "completed"}
 
     # ── Format comment ─────────────────────────────────────────────────────────
@@ -86,22 +87,20 @@ def affiliate_post_node(state: PipelineState) -> dict:
         comment_text = format_affiliate_comment(affiliate_links)
     except Exception as exc:
         logger.error("[AffiliateAgent/post] format_affiliate_comment failed: %s", exc)
-        return {"status": "completed"}  # Non-fatal: skip comment, pipeline is still done
+        return {"status": "completed"}
 
     if not comment_text:
         logger.info("[AffiliateAgent/post] Formatted comment is empty; skipping post.")
         return {"status": "completed"}
 
-    # ── Post comment to Facebook (with retry — video needs processing time) ──────
-    logger.info(
-        "[AffiliateAgent/post] Posting affiliate comment to post_id=%s", facebook_post_id
-    )
+    # ── Post comment (retry — video needs time to finish processing) ───────────
+    logger.info("[AffiliateAgent/post] Posting comment to video_id=%s", comment_target)
     _MAX_ATTEMPTS = 3
     _WAIT_SECONDS = 20
 
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            comment_id = post_facebook_comment(facebook_post_id, comment_text)
+            comment_id = post_facebook_comment(comment_target, comment_text)
             logger.info("[AffiliateAgent/post] Comment posted. comment_id=%s", comment_id)
             return {"status": "completed"}
         except Exception as exc:
@@ -111,14 +110,12 @@ def affiliate_post_node(state: PipelineState) -> dict:
             )
             if attempt < _MAX_ATTEMPTS:
                 logger.info(
-                    "[AffiliateAgent/post] Waiting %ds for Facebook to process reel before retry…",
-                    _WAIT_SECONDS,
+                    "[AffiliateAgent/post] Waiting %ds before retry…", _WAIT_SECONDS,
                 )
                 time.sleep(_WAIT_SECONDS)
 
     logger.error(
-        "[AffiliateAgent/post] All %d attempts failed — affiliate comment NOT posted. "
-        "post_id=%s",
-        _MAX_ATTEMPTS, facebook_post_id,
+        "[AffiliateAgent/post] All %d attempts failed — comment NOT posted. video_id=%s",
+        _MAX_ATTEMPTS, comment_target,
     )
     return {"status": "completed"}

@@ -190,7 +190,8 @@ def upload_facebook_reel(mp4_path: str, caption: str) -> str:
     logger.info("Facebook Reel publish response: %s", publish_data)
     post_id: str = publish_data.get("post_id") or f"{FACEBOOK_PAGE_ID}_{video_id}"
     logger.info("Facebook Reel published. post_id=%s  video_id=%s", post_id, video_id)
-    return post_id
+    # Return both ids — comments must use video_id (post_id uses deprecated statuses API)
+    return post_id, video_id
 
 
 def post_facebook_comment(post_id: str, comment: str) -> str:

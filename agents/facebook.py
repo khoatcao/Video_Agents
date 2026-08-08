@@ -185,7 +185,7 @@ def facebook_node(state: PipelineState) -> dict:
     # ── 3. Upload Reel to Facebook ─────────────────────────────────────────────
     logger.info("[FacebookAgent] Uploading %s to Facebook …", upload_path)
     try:
-        post_id = upload_facebook_reel(mp4_path=upload_path, caption=full_caption)
+        post_id, video_id = upload_facebook_reel(mp4_path=upload_path, caption=full_caption)
     except FileNotFoundError as exc:
         err = str(exc)
         logger.error("[FacebookAgent] %s", err)
@@ -195,17 +195,10 @@ def facebook_node(state: PipelineState) -> dict:
         logger.error("[FacebookAgent] %s", err)
         return {"error": err, "status": "failed"}
 
-    # Construct a best-effort public URL.
-    # post_id format from upload_facebook_reel is "<page_id>_<video_id>" or just "<video_id>".
-    page_id = FACEBOOK_PAGE_ID
-    if "_" in post_id:
-        video_id = post_id.split("_", 1)[1]
-    else:
-        video_id = post_id
-    facebook_url = f"https://www.facebook.com/{page_id}/videos/{video_id}"
-
-    logger.info("[FacebookAgent] Reel published → post_id=%s  url=%s", post_id, facebook_url)
+    facebook_url = f"https://www.facebook.com/{FACEBOOK_PAGE_ID}/videos/{video_id}"
+    logger.info("[FacebookAgent] Reel published → post_id=%s  video_id=%s  url=%s", post_id, video_id, facebook_url)
     return {
         "facebook_post_id": post_id,
+        "facebook_video_id": video_id,
         "facebook_url": facebook_url,
     }

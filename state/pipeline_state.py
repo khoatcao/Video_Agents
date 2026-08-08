@@ -67,6 +67,7 @@ class PipelineState(TypedDict):
     # ── Distribution ─────────────────────────────────────────────────────────
     youtube_url: str
     facebook_post_id: str
+    facebook_video_id: str          # raw video_id for /comments endpoint
     facebook_url: str
 
     # ── Workflow control ──────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ def create_initial_state(topic: str, slot: str) -> PipelineState:
         affiliate_links=[],
         youtube_url="",
         facebook_post_id="",
+        facebook_video_id="",
         facebook_url="",
         error=None,
         retry_count=0,
