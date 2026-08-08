@@ -70,10 +70,7 @@ FACEBOOK_ACCESS_TOKEN: str = _optional("FACEBOOK_ACCESS_TOKEN")
 FACEBOOK_PAGE_ID: str = _optional("FACEBOOK_PAGE_ID")
 
 # ── Affiliate networks ────────────────────────────────────────────────────────
-SHOPEE_AFFILIATE_ID: str = _optional("SHOPEE_AFFILIATE_ID")
-LAZADA_AFFILIATE_KEY: str = _optional("LAZADA_AFFILIATE_KEY")
-TIKI_AFFILIATE_KEY: str = _optional("TIKI_AFFILIATE_KEY")
-# ACCESSTRADE_API_KEY will be added later
+ACCESSTRADE_API_KEY: str = _optional("ACCESSTRADE_API_KEY")
 
 # ── Pipeline I/O ──────────────────────────────────────────────────────────────
 OUTPUT_DIR: Path = Path(_optional("OUTPUT_DIR", "./outputs")).resolve()

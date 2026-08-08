@@ -162,3 +162,38 @@ def upload_youtube_short(
     url = f"https://www.youtube.com/shorts/{video_id}"
     logger.info("[YouTubeAPI] Upload complete → %s", url)
     return url
+
+
+def upload_thumbnail(video_id: str, thumbnail_path: str) -> bool:
+    """
+    Upload a custom thumbnail for a YouTube video.
+
+    Requires the channel to have custom thumbnails enabled
+    (verify your account at youtube.com/verify).
+
+    Args:
+        video_id:       YouTube video ID (from upload_youtube_short response).
+        thumbnail_path: Path to thumbnail JPEG file.
+
+    Returns:
+        True on success, False on failure.
+    """
+    path = Path(thumbnail_path)
+    if not path.is_file():
+        logger.warning("[YouTubeAPI] Thumbnail not found: %s", thumbnail_path)
+        return False
+
+    youtube = _build_youtube_client()
+    try:
+        youtube.thumbnails().set(
+            videoId=video_id,
+            media_body=googleapiclient.http.MediaFileUpload(
+                str(path),
+                mimetype="image/jpeg",
+            ),
+        ).execute()
+        logger.info("[YouTubeAPI] Thumbnail uploaded for video_id=%s", video_id)
+        return True
+    except googleapiclient.errors.HttpError as exc:
+        logger.warning("[YouTubeAPI] Thumbnail upload failed: %s", exc)
+        return False

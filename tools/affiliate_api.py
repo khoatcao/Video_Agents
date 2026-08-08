@@ -1,15 +1,11 @@
 """
-Affiliate link helpers for the Vietnamese market.
+Affiliate link helpers — AccessTrade Vietnam.
 
-Supported networks:
-  - Shopee Vietnam  (unofficial product search + affiliate deep-link)
-  - Lazada Vietnam  (affiliate deep-link via tracking parameter)
-  - Tiki Vietnam    (affiliate deep-link via tracking parameter)
+AccessTrade is Vietnam's largest affiliate network covering Shopee, Lazada,
+Tiki, and hundreds of other merchants under one API.
 
-AccessTrade will be added later.
-
-All public functions return a list of product dicts compatible with the
-AffiliateLink TypedDict in state/pipeline_state.py.
+API docs: https://accesstrade.vn/developer
+Auth: Authorization: Token YOUR_API_KEY
 """
 
 from __future__ import annotations
@@ -20,244 +16,110 @@ from typing import Any
 
 import requests
 
-from config.settings import (
-    LAZADA_AFFILIATE_KEY,
-    SHOPEE_AFFILIATE_ID,
-    TIKI_AFFILIATE_KEY,
-)
+from config.settings import ACCESSTRADE_API_KEY
 
 logger = logging.getLogger(__name__)
 
-_REQUEST_TIMEOUT = 15  # seconds
+_BASE_URL = "https://api.accesstrade.vn/v1"
+_REQUEST_TIMEOUT = 15
+
+_HEADERS = {
+    "Authorization": f"Token {ACCESSTRADE_API_KEY}",
+    "Content-Type": "application/json",
+}
 
 
-# ── Shopee Vietnam ─────────────────────────────────────────────────────────────
+# ── Product search ─────────────────────────────────────────────────────────────
 
-def get_shopee_affiliate_link(keyword: str, limit: int = 3) -> list[dict[str, str]]:
+def search_accesstrade_products(keyword: str, limit: int = 5) -> list[dict[str, str]]:
     """
-    Search Shopee Vietnam for products matching *keyword* and return affiliate links.
+    Search AccessTrade product feed for items matching keyword.
 
-    Uses Shopee's public search endpoint to discover real product listings, then
-    wraps each URL with the configured affiliate ID via the Shopee affiliate
-    deep-link format.
-
-    Args:
-        keyword: Search term (Vietnamese or English).
-        limit:   Maximum number of products to return (capped at 5).
-
-    Returns:
-        List of product dicts with keys: product_name, url, platform, price_range.
+    Returns list of product dicts with: product_name, url, platform, price_range.
+    Falls back to empty list on error.
     """
-    limit = min(limit, 5)
-    search_url = "https://shopee.vn/api/v4/search/search_items"
-    params: dict[str, Any] = {
-        "by": "relevancy",
-        "keyword": keyword,
-        "limit": limit,
-        "newest": 0,
-        "order": "desc",
-        "page_type": "search",
-        "scenario": "PAGE_GLOBAL_SEARCH",
-        "version": 2,
-    }
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0 Safari/537.36"
-        ),
-        "Referer": "https://shopee.vn/",
-    }
+    if not ACCESSTRADE_API_KEY:
+        logger.warning("[AffiliateAPI] ACCESSTRADE_API_KEY not set — skipping search.")
+        return []
 
-    results: list[dict[str, str]] = []
+    limit = min(limit, 10)
     try:
         resp = requests.get(
-            search_url, params=params, headers=headers, timeout=_REQUEST_TIMEOUT
-        )
-        resp.raise_for_status()
-        items: list[dict] = resp.json().get("items") or []
-    except Exception as exc:
-        logger.warning("Shopee search failed for %r: %s", keyword, exc)
-        return _shopee_fallback_search(keyword, limit)
-
-    for item in items[:limit]:
-        item_data = item.get("item_basic", item)
-        name: str = item_data.get("name", "")
-        shop_id: int = item_data.get("shopid", 0)
-        item_id: int = item_data.get("itemid", 0)
-        price_min: int = item_data.get("price_min", 0)
-        price_max: int = item_data.get("price_max", 0)
-
-        if not (name and shop_id and item_id):
-            continue
-
-        product_url = f"https://shopee.vn/product/{shop_id}/{item_id}"
-        affiliate_url = _shopee_affiliate_wrap(product_url)
-
-        price_range = _format_vnd_range(price_min // 100000, price_max // 100000)
-        results.append(
-            {
-                "product_name": name,
-                "url": affiliate_url,
-                "platform": "shopee",
-                "price_range": price_range,
-            }
-        )
-
-    return results
-
-
-def _shopee_affiliate_wrap(product_url: str) -> str:
-    """Append Shopee affiliate tracking to a product URL."""
-    if not SHOPEE_AFFILIATE_ID:
-        return product_url
-    return f"{product_url}?af_id={urllib.parse.quote(SHOPEE_AFFILIATE_ID)}"
-
-
-def _shopee_fallback_search(keyword: str, limit: int) -> list[dict[str, str]]:
-    """Return a search-result URL when the product API is unavailable."""
-    encoded = urllib.parse.quote_plus(keyword)
-    url = f"https://shopee.vn/search?keyword={encoded}"
-    if SHOPEE_AFFILIATE_ID:
-        url += f"&af_id={urllib.parse.quote(SHOPEE_AFFILIATE_ID)}"
-    return [
-        {
-            "product_name": f"Tìm kiếm Shopee: {keyword}",
-            "url": url,
-            "platform": "shopee",
-            "price_range": "Xem trên Shopee",
-        }
-    ][:limit]
-
-
-# ── Lazada Vietnam ─────────────────────────────────────────────────────────────
-
-def get_lazada_affiliate_link(keyword: str, limit: int = 3) -> list[dict[str, str]]:
-    """
-    Build Lazada Vietnam deep-link search URLs with affiliate tracking.
-
-    Lazada's public affiliate programme appends `laz_trackingcode` to URLs.
-    Without a server-side product API key, we return a tracked search URL.
-
-    Args:
-        keyword: Search term.
-        limit:   Ignored (always returns one search link); kept for API symmetry.
-
-    Returns:
-        List with a single product dict pointing to a tracked search.
-    """
-    encoded = urllib.parse.quote_plus(keyword)
-    base = f"https://www.lazada.vn/catalog/?q={encoded}"
-    if LAZADA_AFFILIATE_KEY:
-        base += f"&laz_trackingcode={urllib.parse.quote(LAZADA_AFFILIATE_KEY)}"
-    return [
-        {
-            "product_name": f"Tìm kiếm Lazada: {keyword}",
-            "url": base,
-            "platform": "lazada",
-            "price_range": "Xem trên Lazada",
-        }
-    ]
-
-
-# ── Tiki Vietnam ───────────────────────────────────────────────────────────────
-
-_TIKI_SEARCH_API = "https://tiki.vn/api/v2/products"
-
-
-def get_tiki_affiliate_link(keyword: str, limit: int = 3) -> list[dict[str, str]]:
-    """
-    Search Tiki Vietnam for products and return affiliate-tagged URLs.
-
-    Args:
-        keyword: Search term (Vietnamese or English).
-        limit:   Maximum number of products to return.
-
-    Returns:
-        List of product dicts with keys: product_name, url, platform, price_range.
-    """
-    limit = min(limit, 5)
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0 Safari/537.36"
-        ),
-        "Referer": "https://tiki.vn/",
-    }
-    try:
-        resp = requests.get(
-            _TIKI_SEARCH_API,
-            params={"limit": limit, "q": keyword, "sort": "top_seller"},
-            headers=headers,
+            f"{_BASE_URL}/offers",
+            headers=_HEADERS,
+            params={
+                "keyword": keyword,
+                "page_size": limit,
+                "order_by": "click_count",
+            },
             timeout=_REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
-        products: list[dict] = resp.json().get("data", [])
+        data = resp.json()
+        items = data.get("data", data) if isinstance(data, dict) else data
+        if not isinstance(items, list):
+            items = []
     except Exception as exc:
-        logger.warning("Tiki search failed for %r: %s", keyword, exc)
-        return _tiki_fallback_search(keyword, limit)
+        logger.warning("[AffiliateAPI] AccessTrade search failed for %r: %s", keyword, exc)
+        return []
 
     results: list[dict[str, str]] = []
-    for product in products[:limit]:
-        name: str = product.get("name", "")
-        url_path: str = product.get("url_path") or product.get("url_key", "")
-        price: int = product.get("price", 0)
-        if not name:
+    for item in items[:limit]:
+        name: str = item.get("name") or item.get("product_name") or item.get("offer_name", "")
+        url: str = item.get("url") or item.get("product_url") or item.get("offer_url", "")
+        price = item.get("price") or item.get("min_price") or 0
+        merchant: str = item.get("merchant_name") or item.get("campaign_name", "")
+
+        if not name or not url:
             continue
-        product_url = f"https://tiki.vn/{url_path}" if url_path else "https://tiki.vn/"
-        affiliate_url = _tiki_affiliate_wrap(product_url)
-        price_range = f"{price:,} VND".replace(",", ".") if price else "Xem trên Tiki"
-        results.append(
-            {
-                "product_name": name,
-                "url": affiliate_url,
-                "platform": "tiki",
-                "price_range": price_range,
-            }
+
+        # Convert to affiliate link
+        affiliate_url = generate_affiliate_link(url) or url
+
+        price_str = f"{int(price):,} VND".replace(",", ".") if price else "Xem trên AccessTrade"
+        results.append({
+            "product_name": name,
+            "url": affiliate_url,
+            "platform": merchant.lower() if merchant else "accesstrade",
+            "price_range": price_str,
+        })
+
+    logger.info("[AffiliateAPI] AccessTrade returned %d products for %r.", len(results), keyword)
+    return results
+
+
+def generate_affiliate_link(product_url: str) -> str:
+    """
+    Convert any product URL (Shopee, Lazada, Tiki, etc.) to an AccessTrade affiliate link.
+
+    Returns the affiliate link on success, empty string on failure.
+    """
+    if not ACCESSTRADE_API_KEY:
+        return ""
+
+    try:
+        resp = requests.post(
+            f"{_BASE_URL}/link_generate",
+            headers=_HEADERS,
+            json={"url": product_url},
+            timeout=_REQUEST_TIMEOUT,
         )
-
-    return results or _tiki_fallback_search(keyword, limit)
-
-
-def _tiki_affiliate_wrap(product_url: str) -> str:
-    if not TIKI_AFFILIATE_KEY:
-        return product_url
-    sep = "&" if "?" in product_url else "?"
-    return f"{product_url}{sep}ref={urllib.parse.quote(TIKI_AFFILIATE_KEY)}"
-
-
-def _tiki_fallback_search(keyword: str, limit: int) -> list[dict[str, str]]:
-    encoded = urllib.parse.quote_plus(keyword)
-    url = f"https://tiki.vn/search?q={encoded}"
-    if TIKI_AFFILIATE_KEY:
-        url += f"&ref={urllib.parse.quote(TIKI_AFFILIATE_KEY)}"
-    return [
-        {
-            "product_name": f"Tìm kiếm Tiki: {keyword}",
-            "url": url,
-            "platform": "tiki",
-            "price_range": "Xem trên Tiki",
-        }
-    ][:limit]
+        resp.raise_for_status()
+        data = resp.json()
+        link = data.get("data") or data.get("link") or data.get("affiliate_url", "")
+        return str(link) if link else ""
+    except Exception as exc:
+        logger.warning("[AffiliateAPI] Link generation failed for %r: %s", product_url, exc)
+        return ""
 
 
 # ── Comment formatter ──────────────────────────────────────────────────────────
 
 def format_affiliate_comment(products: list[dict[str, str]]) -> str:
     """
-    Render a Vietnamese comment string that lists affiliate products.
+    Render a Vietnamese comment string listing affiliate products.
 
-    Intended to be posted as the first comment on a YouTube Short or
-    Facebook Reel so the links appear without cluttering the main caption.
-
-    Args:
-        products: List of AffiliateLink dicts (from get_shopee_affiliate_link
-                  or any other getter in this module).
-
-    Returns:
-        Formatted multi-line string ready to post as a comment.
-        Returns an empty string if products is empty.
+    Posted as the first comment on a Facebook Reel.
     """
     if not products:
         return ""
@@ -266,37 +128,15 @@ def format_affiliate_comment(products: list[dict[str, str]]) -> str:
         "🛒 Sản phẩm liên quan trong video:",
         "",
     ]
-    platform_emoji = {
-        "shopee": "🟠",
-        "lazada": "🔵",
-        "tiki": "🔴",
-    }
     for product in products:
         name = product.get("product_name", "Sản phẩm")
         url = product.get("url", "")
         price = product.get("price_range", "")
-        platform = product.get("platform", "")
-        emoji = platform_emoji.get(platform, "🔗")
         price_str = f" — {price}" if price and "Xem" not in price else ""
-        lines.append(f"{emoji} {name}{price_str}")
+        lines.append(f"🔗 {name}{price_str}")
         if url:
             lines.append(f"   👉 {url}")
         lines.append("")
 
     lines.append("💡 Giá có thể thay đổi. Kiểm tra trước khi mua nhé!")
     return "\n".join(lines)
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _format_vnd_range(price_min_k: int, price_max_k: int) -> str:
-    """Format a price range in thousands of VND (as returned by Shopee API)."""
-    def fmt(val: int) -> str:
-        # val is already in VND (after dividing by 100000 in caller)
-        if val >= 1000:
-            return f"{val // 1000}.{(val % 1000) // 100:01d} triệu VND"
-        return f"{val:,} nghìn VND".replace(",", ".")
-
-    if price_min_k == price_max_k or price_max_k == 0:
-        return fmt(price_min_k)
-    return f"{fmt(price_min_k)} – {fmt(price_max_k)}"
