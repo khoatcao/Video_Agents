@@ -189,9 +189,9 @@ def facebook_node(state: PipelineState) -> dict:
             source_block += f"\n🔗 {source_url}"
         full_caption = full_caption.rstrip() + source_block
 
-    # Truncate to Facebook's 2200-char caption limit
-    if len(full_caption) > 2200:
-        full_caption = full_caption[:2197] + "..."
+    # Truncate — keep under 2000 chars to avoid API payload errors
+    if len(full_caption) > 2000:
+        full_caption = full_caption[:1997] + "..."
 
     # ── 2. Mix Facebook Sound Collection music ────────────────────────────────
     upload_path = mix_music(mp4_path, platform="facebook")

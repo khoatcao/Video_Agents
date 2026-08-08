@@ -175,13 +175,15 @@ def upload_facebook_reel(mp4_path: str, caption: str) -> str:
     logger.info("Facebook video bytes uploaded. video_id=%s", video_id)
 
     # Step 3: Publish the reel
+    # Facebook Reels description limit is 2200 chars — truncate to be safe
+    safe_caption = caption[:2200] if len(caption) > 2200 else caption
     publish_resp = requests.post(
         f"{_GRAPH_BASE}/{FACEBOOK_PAGE_ID}/video_reels",
         params={"access_token": FACEBOOK_ACCESS_TOKEN},
         json={
             "upload_phase": "finish",
             "video_id": video_id,
-            "description": caption,
+            "description": safe_caption,
             "video_state": "PUBLISHED",
         },
         timeout=_API_TIMEOUT,
