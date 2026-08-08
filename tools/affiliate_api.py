@@ -33,51 +33,49 @@ _HEADERS = {
 
 def get_hot_products(limit: int = 10) -> list[dict[str, str]]:
     """
-    Fetch currently hot/trending products from AccessTrade — no keyword needed.
+    Fetch top best-selling products from AccessTrade — no keyword needed.
 
-    Sorted by click count (most clicked = most people are looking for).
-    Returns list of product dicts: product_name, url, platform, price_range.
+    Uses /v1/top_products endpoint, returns products with ready-made aff_link.
     """
     if not ACCESSTRADE_API_KEY:
         logger.warning("[AffiliateAPI] ACCESSTRADE_API_KEY not set — skipping.")
         return []
 
-    limit = min(limit, 20)
+    from datetime import datetime, timedelta
+    date_to = datetime.now().strftime("%d-%m-%Y")
+    date_from = (datetime.now() - timedelta(days=7)).strftime("%d-%m-%Y")
+
     try:
         resp = requests.get(
-            f"{_BASE_URL}/offers",
+            f"{_BASE_URL}/top_products",
             headers=_HEADERS,
-            params={
-                "page_size": limit,
-                "order_by": "-click_count",  # descending = hottest first
-            },
+            params={"date_from": date_from, "date_to": date_to},
             timeout=_REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
         data = resp.json()
-        items = data.get("data", data) if isinstance(data, dict) else data
+        items = data.get("data", [])
         if not isinstance(items, list):
             items = []
     except Exception as exc:
-        logger.warning("[AffiliateAPI] AccessTrade hot products failed: %s", exc)
+        logger.warning("[AffiliateAPI] AccessTrade top_products failed: %s", exc)
         return []
 
     results: list[dict[str, str]] = []
     for item in items[:limit]:
-        name: str = item.get("name") or item.get("product_name") or item.get("offer_name", "")
-        url: str = item.get("url") or item.get("product_url") or item.get("offer_url", "")
-        price = item.get("price") or item.get("min_price") or 0
-        merchant: str = item.get("merchant_name") or item.get("campaign_name", "")
+        name: str = item.get("name", "")
+        aff_link: str = item.get("aff_link") or item.get("link", "")
+        price = item.get("price") or 0
+        category: str = item.get("category_name", "")
 
-        if not name or not url:
+        if not name or not aff_link:
             continue
 
-        affiliate_url = generate_affiliate_link(url) or url
-        price_str = f"{int(price):,} VND".replace(",", ".") if price else "Xem trên AccessTrade"
+        price_str = f"{int(float(price)):,} VND".replace(",", ".") if price else "Xem trên AccessTrade"
         results.append({
             "product_name": name,
-            "url": affiliate_url,
-            "platform": merchant.lower() if merchant else "accesstrade",
+            "url": aff_link,
+            "platform": category.lower() if category else "accesstrade",
             "price_range": price_str,
         })
 
@@ -85,29 +83,35 @@ def get_hot_products(limit: int = 10) -> list[dict[str, str]]:
     return results
 
 
-def generate_affiliate_link(product_url: str) -> str:
+def generate_affiliate_link(product_url: str, campaign_id: str = "") -> str:
     """
-    Convert any product URL (Shopee, Lazada, Tiki, etc.) to an AccessTrade affiliate link.
+    Convert any product URL to an AccessTrade affiliate tracking link.
 
-    Returns the affiliate link on success, empty string on failure.
+    Endpoint: POST /v1/product_link/create
+    Returns the aff_link on success, empty string on failure.
     """
     if not ACCESSTRADE_API_KEY:
         return ""
 
     try:
+        payload: dict = {"urls": product_url}
+        if campaign_id:
+            payload["campaign_id"] = campaign_id
+
         resp = requests.post(
-            f"{_BASE_URL}/link_generate",
+            f"{_BASE_URL}/product_link/create",
             headers=_HEADERS,
-            json={"url": product_url},
+            json=payload,
             timeout=_REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
         data = resp.json()
-        link = data.get("data") or data.get("link") or data.get("affiliate_url", "")
-        return str(link) if link else ""
+        success_links = data.get("data", {}).get("success_link", [])
+        if success_links:
+            return success_links[0].get("aff_link") or success_links[0].get("short_link", "")
     except Exception as exc:
         logger.warning("[AffiliateAPI] Link generation failed for %r: %s", product_url, exc)
-        return ""
+    return ""
 
 
 # ── Comment formatter ──────────────────────────────────────────────────────────
