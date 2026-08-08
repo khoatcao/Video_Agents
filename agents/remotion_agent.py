@@ -83,6 +83,9 @@ const ProgressBar: React.FC<{ color: string; frame: number; total: number }> = (
 const TitleScene: React.FC<{ scene: SceneData }> = ({ scene }) => {
   const frame = useCurrentFrame();
   const pulse = interpolate(Math.sin(frame * 0.06), [-1, 1], [0.92, 1.0]);
+  // Hook appears in first 4 frames (~0.13s) — no delay, fast scale-in
+  const hookScale = interpolate(frame, [0, 5], [0.88, 1.0], { extrapolateRight: 'clamp' });
+  const hookOpacity = interpolate(frame, [0, 4], [0, 1], { extrapolateRight: 'clamp' });
   return (
     <AbsoluteFill style={{ backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center', padding: 64, flexDirection: 'column', gap: 32 }}>
       {/* Glowing orb background */}
@@ -90,19 +93,20 @@ const TitleScene: React.FC<{ scene: SceneData }> = ({ scene }) => {
       <SlideUp frame={frame} delay={0}>
         <div style={{ fontSize: 100, textAlign: 'center', lineHeight: 1 }}>⚡</div>
       </SlideUp>
-      <SlideUp frame={frame} delay={8}>
+      {/* Heading: instant appear with fast scale — hook visible within first 4 frames */}
+      <div style={{ transform: `scale(${hookScale})`, opacity: hookOpacity }}>
         <h1 style={{ color: THEME.text, fontSize: 76, fontWeight: 800, textAlign: 'center', lineHeight: 1.15, margin: 0, fontFamily: 'system-ui', letterSpacing: '-1px' }}>
           {scene.heading}
         </h1>
-      </SlideUp>
+      </div>
       {scene.subheading && (
-        <SlideUp frame={frame} delay={20}>
+        <SlideUp frame={frame} delay={12}>
           <p style={{ color: THEME.muted, fontSize: 42, textAlign: 'center', margin: 0, fontFamily: 'system-ui', fontWeight: 500 }}>
             {scene.subheading}
           </p>
         </SlideUp>
       )}
-      <SlideUp frame={frame} delay={28}>
+      <SlideUp frame={frame} delay={18}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ height: 4, width: 60, backgroundColor: scene.accent_color, borderRadius: 2 }} />
           <div style={{ height: 4, width: 120, backgroundColor: scene.accent_color, borderRadius: 2 }} />

@@ -53,9 +53,13 @@ class PipelineState(TypedDict):
     youtube_metadata: YouTubeMetadata
     facebook_metadata: FacebookMetadata
 
+    # ── Content planning (Vietnamese for Facebook) ───────────────────────────
+    vi_scene_plan: List             # Vietnamese version of scene_plan for Facebook
+
     # ── Rendering ────────────────────────────────────────────────────────────
     remotion_project_path: str      # path to generated .tsx file
-    mp4_path: str                   # path to rendered MP4
+    mp4_path: str                   # English MP4 (YouTube)
+    vi_mp4_path: str                # Vietnamese MP4 (Facebook)
 
     # ── Monetisation ─────────────────────────────────────────────────────────
     affiliate_links: List[AffiliateLink]
@@ -107,8 +111,10 @@ def create_initial_state(topic: str, slot: str) -> PipelineState:
             caption="",
             hashtags=[],
         ),
+        vi_scene_plan=[],
         remotion_project_path="",
         mp4_path="",
+        vi_mp4_path="",
         affiliate_links=[],
         youtube_url="",
         facebook_post_id="",

@@ -17,6 +17,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from agents.remotion_agent import _build_tsx, _validate_scenes
 from config.settings import OUTPUT_DIR
 from state.pipeline_state import PipelineState
 
@@ -137,7 +138,69 @@ def render_node(state: PipelineState) -> dict:
         return {"error": err, "status": "failed"}
 
     logger.info("[RenderAgent] Render complete → %s", resolved_path)
+
+    # ── 5. Render Vietnamese version for Facebook (if vi_scene_plan exists) ───
+    vi_mp4_path = _render_vi(state, mp4_path, name)
+
     return {
         "mp4_path": resolved_path,
+        "vi_mp4_path": vi_mp4_path,
         "error": None,
     }
+
+
+def _render_vi(state: PipelineState, en_mp4_path: str, name: str) -> str:
+    """
+    Render Vietnamese version of the video for Facebook Reels.
+    Returns vi_mp4_path on success, empty string if skipped or failed.
+    """
+    vi_scene_plan = state.get("vi_scene_plan", [])
+    if not vi_scene_plan:
+        logger.info("[RenderAgent] No vi_scene_plan — skipping Vietnamese render.")
+        return ""
+
+    vi_scenes = _validate_scenes(vi_scene_plan)
+    if not vi_scenes:
+        logger.warning("[RenderAgent] vi_scene_plan validation produced no scenes — skipping.")
+        return ""
+
+    vi_scenes[0]["scene_type"] = "title"
+    vi_scenes[-1]["scene_type"] = "cta"
+
+    vi_tsx = _build_tsx(vi_scenes)
+    live_tsx = _REMOTION_DIR / "src" / "compositions" / "VideoComposition.tsx"
+    live_tsx.write_text(vi_tsx, encoding="utf-8")
+
+    vi_mp4_path = en_mp4_path.replace(".mp4", "_vi.mp4")
+    cmd = [
+        "npx", "remotion", "render",
+        "src/index.ts",
+        _COMPOSITION_ID,
+        vi_mp4_path,
+        "--codec=h264",
+        "--image-format=jpeg",
+        "--overwrite",
+    ]
+    logger.info("[RenderAgent] Rendering Vietnamese version → %s", vi_mp4_path)
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=str(_REMOTION_DIR),
+            capture_output=True,
+            text=True,
+            timeout=_RENDER_TIMEOUT,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        logger.error("[RenderAgent] Vietnamese render failed: %s", exc)
+        return ""
+
+    if result.returncode != 0:
+        logger.error("[RenderAgent] Vietnamese render error: %s", result.stderr[-1000:])
+        return ""
+
+    if not Path(vi_mp4_path).is_file():
+        logger.error("[RenderAgent] Vietnamese MP4 not found after render.")
+        return ""
+
+    logger.info("[RenderAgent] Vietnamese render complete → %s", vi_mp4_path)
+    return vi_mp4_path

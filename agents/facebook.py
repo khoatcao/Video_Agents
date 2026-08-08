@@ -90,9 +90,15 @@ def facebook_node(state: PipelineState) -> dict:
         — or —
         error, status (on failure)
     """
-    mp4_path: str = state.get("mp4_path", "")
+    vi_mp4_path: str = state.get("vi_mp4_path", "")
+    mp4_path: str = vi_mp4_path if vi_mp4_path else state.get("mp4_path", "")
     facebook_metadata: dict = state.get("facebook_metadata", {})
     affiliate_links: list = state.get("affiliate_links", [])
+
+    if vi_mp4_path:
+        logger.info("[FacebookAgent] Using Vietnamese video for Facebook Reel.")
+    else:
+        logger.info("[FacebookAgent] vi_mp4_path not available — falling back to English video.")
 
     if not FACEBOOK_ACCESS_TOKEN:
         logger.info("[FacebookAgent] FACEBOOK_ACCESS_TOKEN not set — skipping upload.")
