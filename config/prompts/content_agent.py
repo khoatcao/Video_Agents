@@ -91,16 +91,13 @@ Rules:
     }
   ],
   "youtube_metadata": {
-    "title": "YouTube title in English, max 97 chars, include emoji",
-    "description": "150-300 word description in English with SEO keywords and CTA at end",
-    "vi_title": "Tiêu đề YouTube tiếng Việt, tối đa 97 ký tự, có emoji",
-    "vi_description": "Mô tả 150-300 từ tiếng Việt, chứa từ khoá SEO, có CTA cuối",
+    "title": "YouTube title in English max 97 chars with emoji",
+    "description": "50-80 word English description with SEO keywords and CTA",
     "tags": ["tag1", "tag2", "tag3"],
     "category_id": "28"
   },
   "facebook_metadata": {
-    "caption": "Engaging English caption, max 2200 chars, hook on first line",
-    "vi_caption": "Caption hấp dẫn tiếng Việt, tối đa 2200 ký tự, hook ở dòng đầu",
+    "caption": "Hook sentence max 125 chars",
     "hashtags": ["#AI", "#Tech", "#SoftwareEngineering"]
   }
 }

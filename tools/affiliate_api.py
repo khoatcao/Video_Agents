@@ -63,6 +63,17 @@ def get_hot_products(limit: int = 3) -> list[dict[str, str]]:
         logger.warning("[AffiliateAPI] No active campaigns found.")
         return []
 
+    def _format_commission(val) -> str:
+        """Format max_com: ≤100 → percentage, >100 → VND fixed amount."""
+        raw = str(val).replace("%", "").split("/")[0].strip()
+        try:
+            num = float(raw)
+        except (ValueError, TypeError):
+            return ""
+        if "%" in str(val) or num <= 100:
+            return f"Hoa hồng {num:.0f}%"
+        return f"Hoa hồng {int(num):,}đ".replace(",", ".")
+
     # Step 2: Pick top campaigns by commission rate
     def _parse_commission(val) -> float:
         try:
@@ -85,8 +96,12 @@ def get_hot_products(limit: int = 3) -> list[dict[str, str]]:
         if not name or not url:
             continue
 
-        aff_link = generate_affiliate_link(url, campaign_id=campaign_id) or url
-        commission = f"Hoa hồng {max_com}%" if max_com and "%" not in str(max_com) else (f"Hoa hồng {max_com}" if max_com else "Xem AccessTrade")
+        aff_link = generate_affiliate_link(url, campaign_id=campaign_id)
+        if not aff_link:
+            logger.warning("[AffiliateAPI] generate_affiliate_link failed for %s — skipping.", name)
+            continue
+
+        commission = _format_commission(max_com)
 
         results.append({
             "product_name": name,
@@ -122,9 +137,13 @@ def generate_affiliate_link(product_url: str, campaign_id: str = "") -> str:
         )
         resp.raise_for_status()
         data = resp.json()
+        logger.info("[AffiliateAPI] product_link/create response: %s", str(data)[:300])
         success_links = data.get("data", {}).get("success_link", [])
         if success_links:
             return success_links[0].get("aff_link") or success_links[0].get("short_link", "")
+        fail_links = data.get("data", {}).get("fail_link", [])
+        if fail_links:
+            logger.warning("[AffiliateAPI] Link rejected by AccessTrade: %s", fail_links)
     except Exception as exc:
         logger.warning("[AffiliateAPI] Link generation failed for %r: %s", product_url, exc)
     return ""

@@ -31,9 +31,8 @@ Nhận vào thông tin về video và danh sách sản phẩm affiliate liên qu
 Viết một caption cho Facebook Reels:
   - Dòng đầu: câu hook gây tò mò (tối đa 125 ký tự — hiển thị trước "Xem thêm").
   - Thân bài: 2–4 đoạn, giải thích ngắn gọn nội dung video, tại sao nên xem.
-  - Nếu có sản phẩm affiliate, thêm 1 dòng teaser ngắn gọn như \
-"👇 Link sản phẩm trong comment đầu tiên" — KHÔNG liệt kê URL trong caption.
-  - Kết thúc bằng hashtags (tối đa 2200 ký tự tổng).
+  - KHÔNG đặt URL affiliate vào caption — hệ thống sẽ tự append sau.
+  - Kết thúc bằng hashtags (tối đa 1500 ký tự — để dành chỗ cho affiliate links).
 Trả về **đúng một đối tượng JSON** với key "caption" (string).
 Chỉ trả về JSON. Không giải thích.
 """
@@ -163,6 +162,21 @@ def facebook_node(state: PipelineState) -> dict:
         hashtag_str = " ".join(h if h.startswith("#") else f"#{h}" for h in hashtags)
         if hashtag_str not in full_caption:
             full_caption = full_caption.rstrip() + "\n\n" + hashtag_str
+
+    # Append affiliate links directly in caption (avoids pages_manage_engagement App Review)
+    if affiliate_links:
+        aff_lines = ["\n\n🛒 Link liên quan:"]
+        for p in affiliate_links:
+            name = p.get("product_name", "")
+            url = p.get("url", "")
+            commission = p.get("price_range", "")
+            line = f"• {name}"
+            if commission and "Xem" not in commission:
+                line += f" ({commission})"
+            if url:
+                line += f"\n  👉 {url}"
+            aff_lines.append(line)
+        full_caption = full_caption.rstrip() + "\n".join(aff_lines)
 
     # Append source link for credibility
     source: str = state.get("source", "")

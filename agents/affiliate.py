@@ -9,14 +9,9 @@ Affiliate Agent nodes for the LangGraph video-generation pipeline.
 from __future__ import annotations
 
 import logging
-import time
 
 from state.pipeline_state import PipelineState
-from tools.affiliate_api import (
-    format_affiliate_comment,
-    get_hot_products,
-)
-from tools.facebook_api import post_facebook_comment
+from tools.affiliate_api import get_hot_products
 
 logger = logging.getLogger(__name__)
 
@@ -78,44 +73,11 @@ def affiliate_post_node(state: PipelineState) -> dict:
         logger.info("[AffiliateAgent/post] No affiliate links to post.")
         return {"status": "completed"}
 
-    if not comment_target:
-        logger.warning("[AffiliateAgent/post] No facebook video_id — cannot post comment.")
-        return {"status": "completed"}
-
-    # ── Format comment ─────────────────────────────────────────────────────────
-    try:
-        comment_text = format_affiliate_comment(affiliate_links)
-    except Exception as exc:
-        logger.error("[AffiliateAgent/post] format_affiliate_comment failed: %s", exc)
-        return {"status": "completed"}
-
-    if not comment_text:
-        logger.info("[AffiliateAgent/post] Formatted comment is empty; skipping post.")
-        return {"status": "completed"}
-
-    # ── Post comment (retry — video needs time to finish processing) ───────────
-    logger.info("[AffiliateAgent/post] Posting comment to video_id=%s", comment_target)
-    _MAX_ATTEMPTS = 3
-    _WAIT_SECONDS = 20
-
-    for attempt in range(1, _MAX_ATTEMPTS + 1):
-        try:
-            comment_id = post_facebook_comment(comment_target, comment_text)
-            logger.info("[AffiliateAgent/post] Comment posted. comment_id=%s", comment_id)
-            return {"status": "completed"}
-        except Exception as exc:
-            logger.warning(
-                "[AffiliateAgent/post] Attempt %d/%d failed: %s",
-                attempt, _MAX_ATTEMPTS, exc,
-            )
-            if attempt < _MAX_ATTEMPTS:
-                logger.info(
-                    "[AffiliateAgent/post] Waiting %ds before retry…", _WAIT_SECONDS,
-                )
-                time.sleep(_WAIT_SECONDS)
-
-    logger.error(
-        "[AffiliateAgent/post] All %d attempts failed — comment NOT posted. video_id=%s",
-        _MAX_ATTEMPTS, comment_target,
+    # Affiliate links are embedded in the caption by facebook_node.
+    # Comment posting requires pages_manage_engagement (needs Facebook App Review).
+    # Skip for now — links are already visible in the caption.
+    logger.info(
+        "[AffiliateAgent/post] Affiliate links already in caption. "
+        "Comment posting skipped (needs pages_manage_engagement App Review)."
     )
     return {"status": "completed"}
