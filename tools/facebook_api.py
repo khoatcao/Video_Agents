@@ -194,6 +194,48 @@ def upload_facebook_reel(mp4_path: str, caption: str) -> str:
     return post_id, video_id
 
 
+def get_affiliate_catalog_id() -> str:
+    """
+    Fetch the first product catalog linked to the Page (Shopee affiliate catalog).
+    Returns catalog_id string or empty string on failure.
+    """
+    resp = requests.get(
+        f"{_GRAPH_BASE}/{FACEBOOK_PAGE_ID}/product_catalogs",
+        params={"access_token": FACEBOOK_ACCESS_TOKEN, "fields": "id,name"},
+        timeout=_API_TIMEOUT,
+    )
+    data = _check(resp)
+    catalogs = data.get("data", [])
+    logger.info("[FacebookAPI] product_catalogs: %s", catalogs)
+    if catalogs:
+        return catalogs[0]["id"]
+    return ""
+
+
+def get_affiliate_products(catalog_id: str, query: str = "", limit: int = 5) -> list[dict]:
+    """
+    Search Shopee products from the Meta affiliate catalog.
+    Returns list of {id, name, price, url, image_url}.
+    """
+    params: dict = {
+        "access_token": FACEBOOK_ACCESS_TOKEN,
+        "fields": "id,name,price,sale_price,url,image_url,availability",
+        "limit": limit,
+    }
+    if query:
+        params["filter"] = f"name:contains:{query}"
+
+    resp = requests.get(
+        f"{_GRAPH_BASE}/{catalog_id}/products",
+        params=params,
+        timeout=_API_TIMEOUT,
+    )
+    data = _check(resp)
+    products = data.get("data", [])
+    logger.info("[FacebookAPI] affiliate products found: %d", len(products))
+    return products
+
+
 def post_facebook_comment(post_id: str, comment: str) -> str:
     url = f"{_GRAPH_BASE}/{post_id}/comments"
     logger.info("Posting comment to %s", url)

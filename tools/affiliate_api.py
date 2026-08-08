@@ -42,16 +42,17 @@ def get_hot_products(limit: int = 3) -> list[dict[str, str]]:
         logger.warning("[AffiliateAPI] ACCESSTRADE_API_KEY not set — skipping.")
         return []
 
-    # Step 1: Get joined campaigns
+    # Step 1: Get approved joined campaigns (relationship=1 = approved by merchant)
     try:
         resp = requests.get(
             f"{_BASE_URL}/campaigns",
             headers=_headers(),
-            params={"status": 1, "page": 1, "limit": 20},
+            params={"relationship": 1, "page": 1, "limit": 20},
             timeout=_REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
         data = resp.json()
+        logger.info("[AffiliateAPI] campaigns response: %s", str(data)[:300])
         campaigns = data.get("data", [])
         if not isinstance(campaigns, list):
             campaigns = []
