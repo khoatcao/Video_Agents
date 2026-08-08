@@ -32,56 +32,63 @@ def _headers() -> dict:
 
 # ── Hot/trending products ──────────────────────────────────────────────────────
 
-def get_hot_products(limit: int = 10) -> list[dict[str, str]]:
+def get_hot_products(limit: int = 3) -> list[dict[str, str]]:
     """
-    Fetch top best-selling products from AccessTrade — no keyword needed.
+    Fetch joined campaigns from AccessTrade and generate affiliate links for each.
 
-    Uses /v1/top_products endpoint, returns products with ready-made aff_link.
+    Strategy: get active campaigns → generate tracking link → return as product list.
     """
     if not ACCESSTRADE_API_KEY:
         logger.warning("[AffiliateAPI] ACCESSTRADE_API_KEY not set — skipping.")
         return []
 
-    from datetime import datetime, timedelta
-    date_to = datetime.now().strftime("%d-%m-%Y")
-    date_from = (datetime.now() - timedelta(days=7)).strftime("%d-%m-%Y")
-
+    # Step 1: Get joined campaigns
     try:
         resp = requests.get(
-            f"{_BASE_URL}/top_products",
+            f"{_BASE_URL}/campaigns",
             headers=_headers(),
-            params={"date_from": date_from, "date_to": date_to},
+            params={"status": 1, "page": 1, "limit": 20},
             timeout=_REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
         data = resp.json()
-        logger.info("[AffiliateAPI] top_products raw response: %s", str(data)[:500])
-        items = data.get("data", [])
-        if not isinstance(items, list):
-            items = []
+        campaigns = data.get("data", [])
+        if not isinstance(campaigns, list):
+            campaigns = []
     except Exception as exc:
-        logger.warning("[AffiliateAPI] AccessTrade top_products failed: %s", exc)
+        logger.warning("[AffiliateAPI] AccessTrade campaigns failed: %s", exc)
         return []
 
-    results: list[dict[str, str]] = []
-    for item in items[:limit]:
-        name: str = item.get("name", "")
-        aff_link: str = item.get("aff_link") or item.get("link", "")
-        price = item.get("price") or 0
-        category: str = item.get("category_name", "")
+    if not campaigns:
+        logger.warning("[AffiliateAPI] No active campaigns found.")
+        return []
 
-        if not name or not aff_link:
+    # Step 2: Pick top campaigns by commission rate
+    campaigns.sort(key=lambda c: float(c.get("max_com", 0) or 0), reverse=True)
+    top_campaigns = campaigns[:limit]
+
+    # Step 3: Generate affiliate link for each campaign
+    results: list[dict[str, str]] = []
+    for campaign in top_campaigns:
+        name: str = campaign.get("name", "")
+        url: str = campaign.get("url", "")
+        campaign_id: str = str(campaign.get("id", ""))
+        max_com: str = campaign.get("max_com", "")
+
+        if not name or not url:
             continue
 
-        price_str = f"{int(float(price)):,} VND".replace(",", ".") if price else "Xem trên AccessTrade"
+        aff_link = generate_affiliate_link(url, campaign_id=campaign_id) or url
+        commission = f"Hoa hồng {max_com}%" if max_com else "Xem AccessTrade"
+
         results.append({
             "product_name": name,
             "url": aff_link,
-            "platform": category.lower() if category else "accesstrade",
-            "price_range": price_str,
+            "platform": campaign.get("merchant", "accesstrade"),
+            "price_range": commission,
         })
 
-    logger.info("[AffiliateAPI] Got %d hot products from AccessTrade.", len(results))
+    logger.info("[AffiliateAPI] Got %d campaign affiliate links.", len(results))
     return results
 
 
